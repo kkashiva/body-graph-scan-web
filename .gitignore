@@ -42,4 +42,5 @@ next-env.d.ts
 
 # ai agents
 CLAUDE.md
+.claude/*
 AGENTS.md
