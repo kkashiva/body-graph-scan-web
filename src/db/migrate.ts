@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 async function migrate() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -22,10 +23,11 @@ async function migrate() {
 
   // Get already-applied migrations
   const applied = await sql`SELECT filename FROM _migrations ORDER BY filename`;
-  const appliedSet = new Set(applied.map((r: { filename: string }) => r.filename));
+  const appliedSet = new Set(applied.map((r) => r.filename as string));
 
   // Read migration files
-  const migrationsDir = join(__dirname, 'migrations');
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  const migrationsDir = join(currentDir, 'migrations');
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
     .sort();
@@ -40,7 +42,8 @@ async function migrate() {
     const sqlContent = readFileSync(join(migrationsDir, file), 'utf-8');
     console.log(`  apply: ${file}`);
 
-    await sql(sqlContent);
+    // Execute the migration SQL and record it
+    await sql.query(sqlContent, []);
     await sql`INSERT INTO _migrations (filename) VALUES (${file})`;
     count++;
   }
