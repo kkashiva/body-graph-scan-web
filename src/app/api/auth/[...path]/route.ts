@@ -1,3 +1,3 @@
-import { auth } from '@/lib/auth/server';
+import { authApiHandler } from '@neondatabase/auth/next/server';
 
-export const { GET, POST, PUT, DELETE, PATCH } = auth.handler();
+export const { GET, POST } = authApiHandler();
