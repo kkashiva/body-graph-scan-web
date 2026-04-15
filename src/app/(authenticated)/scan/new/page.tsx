@@ -56,7 +56,7 @@ export default async function NewScanPage() {
         </div>
       ) : (
         <div className="mt-6">
-          <ScanCapture />
+          <ScanCapture gender={p.gender} />
         </div>
       )}
     </div>

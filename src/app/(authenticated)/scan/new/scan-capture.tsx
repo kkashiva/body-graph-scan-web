@@ -23,7 +23,7 @@ type Captured = {
   url: string; // object URL for preview
 };
 
-export function ScanCapture() {
+export function ScanCapture({ gender }: { gender?: string | null }) {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>('front');
@@ -118,7 +118,7 @@ export function ScanCapture() {
           overlay={
             <>
               <AlignmentGrid />
-              <FrontSilhouette />
+              <FrontSilhouette gender={gender} />
             </>
           }
           headline="Step 1 · Front pose"
