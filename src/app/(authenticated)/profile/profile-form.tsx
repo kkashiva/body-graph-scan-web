@@ -71,8 +71,8 @@ export function ProfileForm({
             <label
               key={g}
               className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-6 py-2.5 text-sm font-semibold capitalize transition-all ${
-                gender === g
-                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                gender.toLowerCase() === g.toLowerCase()
+                  ? 'border-primary bg-primary text-white shadow-lg shadow-primary/30 scale-[1.05]'
                   : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'
               }`}
             >
@@ -80,7 +80,7 @@ export function ProfileForm({
                 type="radio"
                 name="gender"
                 value={g}
-                checked={gender === g}
+                checked={gender.toLowerCase() === g.toLowerCase()}
                 onChange={() => setGender(g)}
                 className="sr-only"
               />
@@ -103,7 +103,7 @@ export function ProfileForm({
           value={dateOfBirth}
           onChange={(e) => setDateOfBirth(e.target.value)}
           max={new Date().toISOString().slice(0, 10)}
-          className="block w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="block w-full cursor-pointer rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           required
         />
       </div>
@@ -159,11 +159,11 @@ export function ProfileForm({
         </div>
       )}
 
-      <div className="flex items-center gap-4 pt-2">
+      <div className="flex items-center gap-4 pt-4">
         <button
           type="submit"
           disabled={saving || !gender}
-          className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
+          className="flex min-w-[160px] cursor-pointer items-center justify-center rounded-xl border border-primary bg-primary px-10 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:shadow-primary/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-border disabled:bg-card disabled:text-muted-foreground disabled:shadow-none"
         >
           {saving ? 'Saving…' : 'Save profile'}
         </button>

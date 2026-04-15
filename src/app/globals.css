@@ -47,7 +47,7 @@
   }
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -79,4 +79,26 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Custom styles for dark mode visibility and interaction */
+@media (prefers-color-scheme: dark) {
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+}
+
+button, 
+a, 
+label[class*="cursor-pointer"],
+input[type="button"],
+input[type="submit"] {
+  cursor: pointer !important;
+}
+
+/* Ensure focus rings are visible and use the primary color */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }

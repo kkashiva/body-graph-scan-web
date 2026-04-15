@@ -48,7 +48,7 @@ function LoginForm() {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="group flex w-full items-center justify-center gap-4 rounded-xl border border-border bg-background px-6 py-3.5 text-sm font-semibold text-foreground shadow-sm transition-all hover:border-primary/50 hover:bg-accent disabled:opacity-50"
+          className="group flex w-full cursor-pointer items-center justify-center gap-4 rounded-xl border border-border bg-background px-6 py-3.5 text-sm font-semibold text-foreground shadow-sm transition-all hover:border-primary/50 hover:bg-accent disabled:opacity-50"
         >
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path
@@ -73,7 +73,7 @@ function LoginForm() {
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
           By continuing, you agree to our{' '}
-          <Link href="/terms" className="underline hover:text-primary">
+          <Link href="/terms" className="cursor-pointer underline hover:text-primary">
             Terms of Service
           </Link>
         </p>

@@ -176,7 +176,7 @@ export function ScanCapture() {
                   <button
                     type="button"
                     onClick={() => setStep(pose)}
-                    className="text-xs font-medium text-primary underline hover:text-primary/80"
+                    className="cursor-pointer text-xs font-medium text-primary underline hover:text-primary/80"
                   >
                     Retake
                   </button>
@@ -196,7 +196,7 @@ export function ScanCapture() {
               type="button"
               onClick={() => setStep('profile')}
               disabled={submitting}
-              className="flex-1 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent disabled:opacity-50 sm:flex-none"
+              className="flex-1 cursor-pointer rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent disabled:opacity-50 sm:flex-none"
             >
               Back
             </button>
@@ -204,7 +204,7 @@ export function ScanCapture() {
               type="button"
               onClick={submit}
               disabled={submitting}
-              className="flex-1 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
+              className="flex-1 cursor-pointer rounded-xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
             >
               {submitting ? 'Uploading…' : 'Submit for analysis'}
             </button>
@@ -429,7 +429,7 @@ function CameraStep({
                 setFacingMode((m) => (m === 'user' ? 'environment' : 'user'))
               }
               disabled={!!cameraError}
-              className="h-12 w-full rounded-xl border border-border bg-card text-sm font-semibold text-foreground transition-all hover:bg-accent disabled:opacity-50"
+              className="h-12 w-full cursor-pointer rounded-xl border border-border bg-card text-sm font-semibold text-foreground transition-all hover:bg-accent disabled:opacity-50"
             >
               Switch to {facingMode === 'user' ? 'Back' : 'Front'} Camera
             </button>
@@ -459,7 +459,7 @@ function CameraStep({
           <button
             type="button"
             onClick={onBack}
-            className="flex-1 rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent sm:flex-none"
+            className="flex-1 cursor-pointer rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent sm:flex-none"
           >
             Back
           </button>
@@ -468,7 +468,7 @@ function CameraStep({
           type="button"
           onClick={onNext}
           disabled={!existing}
-          className="flex-1 rounded-xl bg-primary px-10 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
+          className="flex-1 cursor-pointer rounded-xl bg-primary px-10 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
         >
           {existing ? (onBack ? 'Continue' : 'Next Step') : 'Capture to continue'}
         </button>
