@@ -5,13 +5,15 @@
 ```mermaid
 flowchart TD
     subgraph USER_INPUT["1. User Input"]
-        A[User enters gender, age, height, weight] --> B[User uploads front + profile photos]
+        A[User fills /profile: gender, DOB, height, weight] --> A2[upsert into user_profiles]
+        A2 --> B[Camera capture at /scan/new with silhouette overlay]
+        B --> B2[Front pose + Profile pose captured to JPEG blobs]
     end
 
     subgraph PREPROCESSING["2. Preprocessing"]
-        B --> C[Create scan record in DB]
-        C --> D[Store images - Vercel Blob]
-        D --> E[Snapshot height/weight into scan]
+        B2 --> C["POST /api/scan → scan row (status=uploading, snapshots h/w)"]
+        C --> D["Client upload() via @vercel/blob/client → scans/&lt;id&gt;/{front,profile}.jpg"]
+        D --> E["POST /api/scan/[id]/finalize → save URLs, status=analyzing"]
         E --> F[Load active analysis_config for user gender]
     end
 
@@ -74,6 +76,53 @@ flowchart TD
     style VLM_ANALYSIS fill:#fff3e0,stroke:#FF9800
     style FAN_IN fill:#e8f5e9,stroke:#4CAF50
     style USER_INPUT fill:#f3e5f5,stroke:#9C27B0
+```
+
+## Capture & Upload Flow (Phase 2)
+
+```mermaid
+sequenceDiagram
+    participant U as User (browser)
+    participant Cam as getUserMedia stream
+    participant CT as ScanCapture (client)
+    participant API as Next.js API routes
+    participant Blob as Vercel Blob
+    participant DB as Neon PostgreSQL
+
+    U->>CT: Open /scan/new
+    CT->>API: GET (server component)
+    API->>DB: SELECT user_profiles
+    alt profile incomplete
+        API-->>U: Banner → /profile
+    else profile complete
+        API-->>U: Render ScanCapture
+    end
+
+    CT->>Cam: navigator.mediaDevices.getUserMedia
+    Cam-->>CT: MediaStream (9:16)
+    Note over CT: SVG overlay<br/>(silhouette + thirds grid)
+    U->>CT: Align + press Capture
+    CT->>CT: 3-2-1 countdown
+    CT->>CT: canvas.toBlob → JPEG 0.9
+
+    U->>CT: Repeat for profile pose, then Submit
+
+    CT->>API: POST /api/scan
+    API->>DB: INSERT scans (status='uploading', h/w snapshot)
+    API-->>CT: { id }
+
+    loop front then profile
+        CT->>API: POST /api/blob/upload (generate token)
+        API->>DB: verify scan owner
+        API-->>CT: client token (scoped to scans/&lt;id&gt;/&lt;pose&gt;.jpg)
+        CT->>Blob: PUT direct upload
+        Blob-->>CT: public URL
+    end
+
+    CT->>API: POST /api/scan/&lt;id&gt;/finalize { frontUrl, profileUrl }
+    API->>DB: UPDATE scans SET urls, status='analyzing'
+    API-->>CT: { id }
+    CT-->>U: redirect /scan/&lt;id&gt;
 ```
 
 ## Authentication Flow
@@ -142,3 +191,7 @@ flowchart TD
 4. **Auditable results** -- Every VLM response is stored as JSONB. The weight applied to each analysis is snapshotted. Results are fully reproducible and debuggable.
 
 5. **Trendlines from snapshots** -- Height and weight are snapshotted into each scan, making trendline queries simple joins without temporal profile lookups.
+
+6. **Standardized capture** -- The silhouette + grid overlay forces consistent framing across sessions and users. The downstream fan-out crop math assumes the body occupies a known region of the frame; without standardized capture the per-region crops would drift and the VLM estimates would regress.
+
+7. **Client-side direct upload** -- Images go browser → Vercel Blob directly via a signed, short-lived token. This avoids the 4.5 MB serverless body-size limit and keeps image bytes off the Next.js runtime. The `/api/blob/upload` handler only mints tokens after verifying `scans.user_id` matches the session user and that the pathname matches the canonical `scans/<scanId>/<pose>.jpg` form.

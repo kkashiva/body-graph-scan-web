@@ -144,3 +144,30 @@ erDiagram
 - **`feature_analyses`** is the bridge between the LangGraph pipeline and the database -- each fan-out node writes one row, the fan-in node reads all rows for a scan to produce `scan_results`.
 - **`raw_llm_response`** (JSONB) stores full VLM output for debugging and retraining.
 - **`weight_applied`** is denormalized into `feature_analyses` so results are auditable even if the config changes later.
+
+## Scan Status Lifecycle
+
+`scans.status` transitions are managed by the API routes:
+
+```mermaid
+stateDiagram-v2
+    [*] --> uploading: POST /api/scan<br/>(h/w snapshotted)
+    uploading --> analyzing: POST /api/scan/[id]/finalize<br/>(both blob URLs present)
+    analyzing --> completed: Phase 3 pipeline success
+    analyzing --> failed: Phase 3 pipeline error<br/>(sets error_message)
+    uploading --> failed: upload timed out / aborted
+```
+
+- `pending` is reserved for future flows where a scan row is created before image capture begins; Phase 2 always starts in `uploading`.
+- The finalize endpoint will only accept URLs on `*.public.blob.vercel-storage.com` and only flips status from `uploading`/`pending` (idempotent on retry, safe against race conditions).
+
+## Blob Storage Layout
+
+Images are stored in Vercel Blob under a deterministic namespace so the pipeline can locate them by scan id:
+
+```
+scans/<scanId>/front.jpg
+scans/<scanId>/profile.jpg
+```
+
+Pathnames are enforced by `/api/blob/upload` -- the client cannot supply an alternate path. Ownership is enforced by verifying `scans.user_id = session.user.id` before minting the upload token.

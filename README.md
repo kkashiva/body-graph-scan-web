@@ -6,11 +6,12 @@ Measuring body fat % typically requires specialized, expensive equipment (DEXA s
 
 ## How It Works
 
-1. **User inputs** their gender, age, height, and weight.
-2. **User uploads** a front-facing and side-profile body photo.
-3. **AI graph pipeline** breaks each image into isolated body regions (jawline, neck, triceps, belly, love handles, forearms, etc.) and analyzes each one independently using a Vision-Language Model.
-4. **Fan-in aggregation** combines per-region estimates with configurable weights to produce a final body fat % and circumference measurements.
-5. **Results are stored** so users can track their body composition trends over time with charts.
+1. **User fills in** gender, date of birth, height, and weight on `/profile`.
+2. **User captures** a front-facing and side-profile photo using the in-browser camera. A translucent silhouette + alignment grid overlay on the live video feed guides consistent framing so the downstream crop/fan-out logic behaves the same for every scan.
+3. **Photos upload directly** to Vercel Blob from the browser (bypassing serverless body-size limits) under a per-scan namespace (`scans/<scanId>/{front,profile}.jpg`).
+4. **AI graph pipeline** (Phase 3) breaks each image into isolated body regions (jawline, neck, triceps, belly, love handles, forearms, etc.) and analyzes each one independently using a Vision-Language Model.
+5. **Fan-in aggregation** combines per-region estimates with configurable weights to produce a final body fat % and circumference measurements.
+6. **Results are stored** so users can track their body composition trends over time with charts.
 
 ### Why a Graph Architecture?
 
@@ -35,12 +36,21 @@ Height is the only user-provided measurement. All circumferences are estimated f
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS v4 |
+| Camera | Browser `MediaDevices.getUserMedia` + SVG silhouette overlays |
+| Image Storage | [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) (client-upload) |
 | Database | PostgreSQL on [Neon](https://neon.tech) |
 | Auth | Neon Auth (Google OAuth) |
 | AI Pipeline | LangGraph (LangChain JS) -- fan-out/fan-in graph |
 | LLM Providers | Qwen VL, Google Gemini |
 | Hosting | Vercel |
+
+## Implementation Status
+
+- [x] **Phase 1** -- Auth (Google OAuth via Neon Auth) + full DB schema with migration runner
+- [x] **Phase 2** -- Profile form, standardized in-browser camera capture with silhouette overlays, Vercel Blob upload pipeline
+- [ ] **Phase 3** -- LangGraph fan-out/fan-in VLM analysis and Navy-formula aggregation
+- [ ] **Phase 4** -- Dashboard with historical scans and trendline charts
 
 ## Architecture
 
@@ -55,6 +65,7 @@ See detailed diagrams:
 - Node.js 18+
 - A [Neon](https://neon.tech) database with Auth enabled
 - Google OAuth credentials configured in Neon Auth
+- A Vercel Blob store (create one in the Vercel dashboard -- Storage -> Blob). In production the `BLOB_READ_WRITE_TOKEN` is injected automatically when the store is linked to the project.
 
 ### Setup
 
@@ -79,26 +90,59 @@ npm run dev
 | `DATABASE_URL` | Neon PostgreSQL connection string |
 | `NEON_AUTH_BASE_URL` | Neon Auth endpoint URL |
 | `NEON_AUTH_COOKIE_SECRET` | Auth cookie secret (`openssl rand -base64 32`) |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob store token (auto-injected on Vercel when a store is linked; required in `.env.local` for local uploads) |
+
+### Local camera testing
+
+`getUserMedia` is gated to secure contexts. `http://localhost:3000` counts as secure, so `npm run dev` works without extra setup. If you need to test from another device on your LAN, front the dev server with an HTTPS tunnel.
 
 ## Project Structure
 
 ```
 src/
   app/
-    login/               # Google OAuth sign-in
-    (authenticated)/     # Protected routes
-      dashboard/         # Scan history + trendline charts
-      scan/new/          # Upload photos for analysis
-      scan/[id]/         # Scan results detail
-      profile/           # User measurements (gender, DOB, height, weight)
-    api/auth/[...path]/  # Neon Auth handler
+    login/                          # Google OAuth sign-in
+    (authenticated)/                # Protected routes
+      dashboard/                    # Scan history + trendline charts (Phase 4)
+      profile/
+        page.tsx                    # Server: loads user_profiles
+        profile-form.tsx            # Client: gender / DOB / height / weight
+      scan/new/
+        page.tsx                    # Server: profile-completeness guard
+        scan-capture.tsx            # Client: 3-step front/profile/review flow
+        silhouette.tsx              # Front + profile silhouette SVGs, alignment grid
+      scan/[id]/                    # Scan results detail (Phase 3)
+    api/
+      auth/[...path]/               # Neon Auth catch-all handler
+      profile/                      # POST -- upsert user_profiles
+      scan/                         # POST -- create scan (status=uploading, snapshots h/w)
+      scan/[id]/finalize/           # POST -- save blob URLs, flip to status=analyzing
+      blob/upload/                  # handleUpload token handler for @vercel/blob
   lib/
-    auth/                # Auth server + client config
-    db.ts                # Neon SQL client
+    auth/                           # Auth server + client config
+    db.ts                           # Neon SQL client
   db/
-    migrations/          # Numbered SQL migration files
-    migrate.ts           # Migration runner
+    migrations/                     # Numbered SQL migration files
+    migrate.ts                      # Migration runner
 ```
+
+## Scan Capture Flow
+
+The `/scan/new` experience is a three-step client flow, gated server-side on profile completeness:
+
+1. **Front pose** -- Live camera with a green body silhouette overlay and rule-of-thirds grid. User aligns body inside the silhouette; a 3-second countdown gives time to settle before the canvas grab.
+2. **Profile (side) pose** -- Same UI with a blue side-profile silhouette.
+3. **Review** -- Thumbnails of both captures with retake buttons; Submit sends both images through the upload pipeline.
+
+Submit triggers:
+
+```
+POST /api/scan                 -> { id }  (status='uploading')
+@vercel/blob upload() x2       -> scans/<id>/{front,profile}.jpg
+POST /api/scan/<id>/finalize   -> status='analyzing' (Phase 3 entry point)
+```
+
+The captured frame is written un-mirrored even when the user-facing camera is selected, so anatomical left/right stays correct for the downstream VLM.
 
 ## Target Audience
 
