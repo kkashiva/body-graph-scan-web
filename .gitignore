@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env variables
 .env.local
+.env
 
 # vercel
 .vercel

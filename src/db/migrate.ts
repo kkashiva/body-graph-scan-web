@@ -2,6 +2,10 @@ import { neon } from '@neondatabase/serverless';
 import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { loadEnvConfig } from '@next/env';
+
+loadEnvConfig(process.cwd());
+
 
 async function migrate() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -43,8 +47,10 @@ async function migrate() {
     console.log(`  apply: ${file}`);
 
     // Execute the migration SQL and record it
-    await sql.query(sqlContent, []);
+    await sql.query(sqlContent);
     await sql`INSERT INTO _migrations (filename) VALUES (${file})`;
+
+
     count++;
   }
 
