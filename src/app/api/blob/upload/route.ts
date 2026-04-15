@@ -40,10 +40,11 @@ export async function POST(request: Request) {
           throw new Error('Scan not found');
         }
 
-        // Enforce a canonical pathname. The client may have submitted a
-        // different pathname — we ignore it and use the canonical one so
-        // clients can't write to other users' folders.
-        const expected = `scans/${user.id}/${parsed.scanId}/${parsed.pose}.jpg`;
+        // Enforce a canonical pathname. Scan ownership is already checked
+        // above, so pathname just needs to match the scanId/pose the client
+        // claims in clientPayload. We don't embed userId in the path because
+        // the client doesn't have it; the DB check above is the real gate.
+        const expected = `scans/${parsed.scanId}/${parsed.pose}.jpg`;
         if (pathname !== expected) {
           throw new Error(`pathname must be ${expected}`);
         }
