@@ -30,21 +30,22 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-gray-50">
-        <nav className="border-b border-gray-200 bg-white px-6 py-3">
+      <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-300">
+        <nav className="sticky top-0 z-50 border-b border-border bg-background/80 px-6 py-3 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Link href="/dashboard" className="text-lg font-bold text-gray-900">
+            <div className="flex items-center gap-8">
+              <Link href="/dashboard" className="group flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
+                <div className="h-2 w-2 rounded-full bg-primary" />
                 Body Scan
               </Link>
-              <div className="flex items-center gap-4 text-sm">
-                <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+              <div className="flex items-center gap-6 text-sm font-medium">
+                <Link href="/dashboard" className="text-muted-foreground transition-colors hover:text-primary">
                   Dashboard
                 </Link>
-                <Link href="/scan/new" className="text-gray-600 hover:text-gray-900">
+                <Link href="/scan/new" className="text-muted-foreground transition-colors hover:text-primary">
                   New Scan
                 </Link>
-                <Link href="/profile" className="text-gray-600 hover:text-gray-900">
+                <Link href="/profile" className="text-muted-foreground transition-colors hover:text-primary">
                   Profile
                 </Link>
               </div>

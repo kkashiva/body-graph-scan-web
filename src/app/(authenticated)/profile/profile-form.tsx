@@ -58,27 +58,29 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+    <form onSubmit={handleSubmit} className="mt-8 space-y-8">
       <fieldset>
-        <legend className="text-sm font-medium text-gray-900">Gender</legend>
-        <p className="text-xs text-gray-500">
+        <legend className="text-sm font-semibold tracking-wide text-foreground">
+          Gender
+        </legend>
+        <p className="text-xs text-muted-foreground">
           Used to pick the correct Navy formula and analysis weights.
         </p>
-        <div className="mt-3 flex gap-4">
+        <div className="mt-4 flex flex-wrap gap-4">
           {(['male', 'female', 'other'] as Gender[]).map((g) => (
             <label
               key={g}
-              className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm capitalize ${
-                gender === g
-                  ? 'border-gray-900 bg-gray-900 text-white'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+              className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-6 py-2.5 text-sm font-semibold capitalize transition-all ${
+                gender.toLowerCase() === g.toLowerCase()
+                  ? 'border-primary bg-primary text-white shadow-lg shadow-primary/30 scale-[1.05]'
+                  : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'
               }`}
             >
               <input
                 type="radio"
                 name="gender"
                 value={g}
-                checked={gender === g}
+                checked={gender.toLowerCase() === g.toLowerCase()}
                 onChange={() => setGender(g)}
                 className="sr-only"
               />
@@ -88,10 +90,10 @@ export function ProfileForm({
         </div>
       </fieldset>
 
-      <div>
+      <div className="space-y-2">
         <label
           htmlFor="dob"
-          className="block text-sm font-medium text-gray-900"
+          className="block text-sm font-semibold tracking-wide text-foreground"
         >
           Date of birth
         </label>
@@ -101,16 +103,16 @@ export function ProfileForm({
           value={dateOfBirth}
           onChange={(e) => setDateOfBirth(e.target.value)}
           max={new Date().toISOString().slice(0, 10)}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-gray-900 focus:outline-none"
+          className="block w-full cursor-pointer rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           required
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-2">
           <label
             htmlFor="height"
-            className="block text-sm font-medium text-gray-900"
+            className="block text-sm font-semibold tracking-wide text-foreground"
           >
             Height (cm)
           </label>
@@ -123,14 +125,15 @@ export function ProfileForm({
             max="260"
             value={heightCm}
             onChange={(e) => setHeightCm(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-gray-900 focus:outline-none"
+            className="block w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="182"
             required
           />
         </div>
-        <div>
+        <div className="space-y-2">
           <label
             htmlFor="weight"
-            className="block text-sm font-medium text-gray-900"
+            className="block text-sm font-semibold tracking-wide text-foreground"
           >
             Weight (kg)
           </label>
@@ -143,28 +146,44 @@ export function ProfileForm({
             max="400"
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-gray-900 focus:outline-none"
+            className="block w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="68.5"
             required
           />
         </div>
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">
           {error}
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 pt-4">
         <button
           type="submit"
           disabled={saving || !gender}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 disabled:opacity-50"
+          className="flex min-w-[160px] cursor-pointer items-center justify-center rounded-xl border border-primary bg-primary px-10 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:shadow-primary/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-border disabled:bg-card disabled:text-muted-foreground disabled:shadow-none"
         >
           {saving ? 'Saving…' : 'Save profile'}
         </button>
         {savedAt && !saving && (
-          <span className="text-xs text-green-700">Saved.</span>
+          <span className="flex items-center gap-1 text-xs font-medium text-green-500">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            Changes saved
+          </span>
         )}
       </div>
     </form>
