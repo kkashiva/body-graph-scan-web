@@ -17,13 +17,15 @@ export function LogoutButton() {
   const email = session?.user?.email;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-4">
       {email && (
-        <span className="text-xs text-gray-500">{email}</span>
+        <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
+          {email}
+        </span>
       )}
       <button
         onClick={handleLogout}
-        className="rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+        className="rounded-lg border border-border bg-card px-4 py-1.5 text-xs font-semibold text-foreground transition-all hover:border-primary/50 hover:bg-accent active:scale-95"
       >
         Logout
       </button>

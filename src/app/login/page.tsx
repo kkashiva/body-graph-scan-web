@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { authClient } from '@/lib/auth/client';
+import Link from 'next/link';
 
 function LoginForm() {
   const [loading, setLoading] = useState(false);
@@ -23,17 +24,22 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Body Scan</h1>
-          <p className="mt-2 text-sm text-gray-500">
+    <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-10 shadow-2xl shadow-primary/5">
+        <div className="mb-10 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/20">
+            <div className="h-6 w-6 rounded-full bg-white" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Body Scan
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
             Estimate your body fat % from photos
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+          <div className="mb-6 rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">
             {error}
           </div>
         )}
@@ -42,28 +48,35 @@ function LoginForm() {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          className="group flex w-full items-center justify-center gap-4 rounded-xl border border-border bg-background px-6 py-3.5 text-sm font-semibold text-foreground shadow-sm transition-all hover:border-primary/50 hover:bg-accent disabled:opacity-50"
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <svg width="20" height="20" viewBox="0 0 24 24">
             <path
-              d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
               fill="#4285F4"
             />
             <path
-              d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
               fill="#34A853"
             />
             <path
-              d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z"
+              d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94L5.84 14.1z"
               fill="#FBBC05"
             />
             <path
-              d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 2.58 9 3.58Z"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               fill="#EA4335"
             />
           </svg>
-          {loading ? 'Redirecting...' : 'Sign in with Google'}
+          {loading ? 'Redirecting...' : 'Continue with Google'}
         </button>
+
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          By continuing, you agree to our{' '}
+          <Link href="/terms" className="underline hover:text-primary">
+            Terms of Service
+          </Link>
+        </p>
       </div>
     </div>
   );

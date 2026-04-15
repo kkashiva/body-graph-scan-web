@@ -31,9 +31,9 @@ export default async function ProfilePage() {
   };
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-      <p className="mt-2 text-sm text-gray-500">
+    <div className="mx-auto max-w-lg">
+      <h1 className="text-3xl font-bold tracking-tight text-foreground">Profile</h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
         These values are used as inputs to the body fat estimation pipeline. Height
         and weight are snapshotted into every scan so your trendlines stay accurate.
       </p>

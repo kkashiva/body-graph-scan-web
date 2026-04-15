@@ -148,18 +148,18 @@ export function ScanCapture() {
       )}
 
       {step === 'review' && (
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-xl font-bold tracking-tight text-foreground">
             Step 3 · Review
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             Confirm both photos look clear and well-aligned before submitting.
           </p>
 
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-6">
             {(['front', 'profile'] as Pose[]).map((pose) => (
-              <div key={pose}>
-                <div className="aspect-[9/16] w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+              <div key={pose} className="space-y-3">
+                <div className="aspect-[9/16] w-full overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
                   {captures[pose] && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -169,14 +169,14 @@ export function ScanCapture() {
                     />
                   )}
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="font-medium capitalize text-gray-700">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-sm font-semibold capitalize text-foreground">
                     {pose}
                   </span>
                   <button
                     type="button"
                     onClick={() => setStep(pose)}
-                    className="text-gray-600 underline hover:text-gray-900"
+                    className="text-xs font-medium text-primary underline hover:text-primary/80"
                   >
                     Retake
                   </button>
@@ -186,17 +186,17 @@ export function ScanCapture() {
           </div>
 
           {submitError && (
-            <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+            <div className="mt-6 rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">
               {submitError}
             </div>
           )}
 
-          <div className="mt-6 flex gap-2">
+          <div className="mt-8 flex gap-3">
             <button
               type="button"
               onClick={() => setStep('profile')}
               disabled={submitting}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="flex-1 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent disabled:opacity-50 sm:flex-none"
             >
               Back
             </button>
@@ -204,7 +204,7 @@ export function ScanCapture() {
               type="button"
               onClick={submit}
               disabled={submitting}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 disabled:opacity-50"
+              className="flex-1 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
             >
               {submitting ? 'Uploading…' : 'Submit for analysis'}
             </button>
@@ -228,31 +228,31 @@ function Stepper({
     { key: 'review', label: 'Review', done: false },
   ] as const;
   return (
-    <ol className="flex items-center gap-2 text-xs">
+    <ol className="flex items-center justify-center gap-4 sm:justify-start">
       {items.map((it, i) => {
         const active = it.key === step;
         return (
-          <li key={it.key} className="flex items-center gap-2">
+          <li key={it.key} className="flex items-center gap-3">
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-semibold ${
+              className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition-all ${
                 active
-                  ? 'border-gray-900 bg-gray-900 text-white'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                   : it.done
-                    ? 'border-green-600 bg-green-50 text-green-700'
-                    : 'border-gray-300 bg-white text-gray-500'
+                    ? 'border-green-500 bg-green-500/10 text-green-500'
+                    : 'border-border bg-card text-muted-foreground'
               }`}
             >
               {i + 1}
             </span>
             <span
-              className={
-                active ? 'font-semibold text-gray-900' : 'text-gray-500'
-              }
+              className={`hidden text-sm font-semibold transition-colors sm:inline ${
+                active ? 'text-foreground' : 'text-muted-foreground'
+              }`}
             >
               {it.label}
             </span>
             {i < items.length - 1 && (
-              <span className="mx-1 h-px w-8 bg-gray-300" />
+              <span className="h-px w-6 bg-border sm:w-10" />
             )}
           </li>
         );
@@ -380,12 +380,12 @@ function CameraStep({
   }
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-gray-900">{headline}</h2>
-      <p className="mt-1 text-sm text-gray-500">{instructions}</p>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <h2 className="text-xl font-bold tracking-tight text-foreground">{headline}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{instructions}</p>
 
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row">
-        <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-lg border border-gray-200 bg-black">
+      <div className="mt-8 flex flex-col gap-8 sm:flex-row">
+        <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-3xl border border-border bg-black shadow-2xl">
           <video
             ref={videoRef}
             autoPlay
@@ -397,48 +397,56 @@ function CameraStep({
           />
           {overlay}
           {countdown !== null && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="text-7xl font-bold text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)]">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+              <span className="text-8xl font-black text-white drop-shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
                 {countdown}
               </span>
             </div>
           )}
           {cameraError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-4 text-center text-sm text-red-300">
-              {cameraError}
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-8 text-center backdrop-blur-sm">
+              <svg className="mb-4 h-12 w-12 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-sm font-medium text-white">{cameraError}</p>
             </div>
           )}
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:w-56">
-          <button
-            type="button"
-            onClick={startCountdown}
-            disabled={!!cameraError || countdown !== null}
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 disabled:opacity-50"
-          >
-            {countdown !== null ? `Capturing in ${countdown}…` : 'Capture'}
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setFacingMode((m) => (m === 'user' ? 'environment' : 'user'))
-            }
-            disabled={!!cameraError}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Switch camera ({facingMode === 'user' ? 'front' : 'back'})
-          </button>
+        <div className="flex w-full flex-col gap-4 sm:w-64">
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={startCountdown}
+              disabled={!!cameraError || countdown !== null}
+              className="h-12 w-full rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
+            >
+              {countdown !== null ? `Capturing in ${countdown}…` : 'Start Timer (3s)'}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFacingMode((m) => (m === 'user' ? 'environment' : 'user'))
+              }
+              disabled={!!cameraError}
+              className="h-12 w-full rounded-xl border border-border bg-card text-sm font-semibold text-foreground transition-all hover:bg-accent disabled:opacity-50"
+            >
+              Switch to {facingMode === 'user' ? 'Back' : 'Front'} Camera
+            </button>
+          </div>
 
           {existing && (
-            <div className="mt-2">
-              <p className="text-xs text-gray-500">Last capture</p>
-              <div className="mt-1 aspect-[9/16] w-full overflow-hidden rounded border border-gray-200">
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-muted-foreground uppercase tracking-widest">Last capture</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              </div>
+              <div className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-border bg-card shadow-inner transition-all hover:border-primary/30">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={existing.url}
                   alt={`${pose} preview`}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
               </div>
             </div>
@@ -446,12 +454,12 @@ function CameraStep({
         </div>
       </div>
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-10 flex gap-3 border-t border-border pt-8">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent sm:flex-none"
           >
             Back
           </button>
@@ -460,9 +468,9 @@ function CameraStep({
           type="button"
           onClick={onNext}
           disabled={!existing}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 disabled:opacity-50"
+          className="flex-1 rounded-xl bg-primary px-10 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
         >
-          {existing ? 'Next' : 'Capture first'}
+          {existing ? (onBack ? 'Continue' : 'Next Step') : 'Capture to continue'}
         </button>
       </div>
     </div>
