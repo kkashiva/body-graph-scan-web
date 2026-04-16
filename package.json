@@ -10,12 +10,17 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.40",
+    "@langchain/google-genai": "^2.1.27",
+    "@langchain/langgraph": "^1.2.8",
+    "@langchain/openai": "^1.4.4",
     "@neondatabase/auth": "^0.1.0-beta.21",
     "@neondatabase/serverless": "^1.0.2",
     "@vercel/blob": "^2.3.3",
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sharp": "^0.34.5",
     "tsx": "^4.21.0"
   },
   "devDependencies": {
