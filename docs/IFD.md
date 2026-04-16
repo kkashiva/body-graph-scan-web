@@ -78,6 +78,81 @@ flowchart TD
     style USER_INPUT fill:#f3e5f5,stroke:#9C27B0
 ```
 
+## LangGraph Pipeline Flow (Phase 3)
+
+```mermaid
+sequenceDiagram
+    participant FIN as Finalize Route
+    participant GP as graph.ts<br/>runPipeline()
+    participant CR as crop.ts
+    participant BLOB as Vercel Blob
+    participant AN as analyze.ts<br/>×8 parallel
+    participant VLM as VLM (Gemini/Qwen)
+    participant AG as aggregate.ts
+    participant DB as Neon PostgreSQL
+
+    FIN->>FIN: after() — response already sent
+    FIN->>GP: runPipeline(scanId)
+    GP->>DB: Load scan + profile + active config
+    GP->>CR: crop_images(state)
+    CR->>BLOB: fetch front + profile images
+    BLOB-->>CR: image buffers
+    CR->>CR: sharp.extract() × 8 regions
+    CR-->>GP: croppedRegions[]
+
+    par Fan-out (8 parallel VLM calls)
+        GP->>AN: Send("analyze_region", jawline)
+        GP->>AN: Send("analyze_region", neck)
+        GP->>AN: Send("analyze_region", chest)
+        GP->>AN: Send("analyze_region", triceps)
+        GP->>AN: Send("analyze_region", belly)
+        GP->>AN: Send("analyze_region", waist)
+        GP->>AN: Send("analyze_region", hips)
+        GP->>AN: Send("analyze_region", forearms)
+    end
+
+    AN->>VLM: SystemMessage(tuned prompt) + HumanMessage(base64 image)
+    VLM-->>AN: JSON { local_bf_estimate, confidence, explanation, circumference_cm? }
+    AN-->>GP: analyses[] (concat reducer merges)
+
+    GP->>AG: aggregate(state)
+    AG->>DB: SELECT feature_weights for config
+    AG->>AG: Weighted avg BF% + Navy formula + BMI
+    AG->>DB: INSERT feature_analyses × 8
+    AG->>DB: INSERT body_measurements (neck, waist, hips, chest)
+    AG->>DB: INSERT scan_results
+    AG->>DB: UPDATE scans SET status='completed'
+```
+
+## Scan Results Polling (Phase 3)
+
+```mermaid
+sequenceDiagram
+    participant U as User (browser)
+    participant SP as scan/[id]/page.tsx
+    participant API as GET /api/scan/[id]/status
+    participant DB as Neon PostgreSQL
+
+    U->>SP: redirect after finalize
+    SP->>DB: SELECT status FROM scans
+    DB-->>SP: status='analyzing'
+    SP-->>U: Render spinner + ScanPolling
+
+    loop Every 3 seconds
+        U->>API: GET /api/scan/{id}/status
+        API->>DB: SELECT status
+        DB-->>API: status
+        alt still analyzing
+            API-->>U: { status: 'analyzing' }
+        else completed or failed
+            API-->>U: { status: 'completed' }
+            U->>SP: router.refresh()
+            SP->>DB: SELECT scan + results + analyses
+            SP-->>U: Render results page
+        end
+    end
+```
+
 ## Capture & Upload Flow (Phase 2)
 
 ```mermaid
@@ -195,3 +270,9 @@ flowchart TD
 6. **Standardized capture** -- The silhouette + grid overlay forces consistent framing across sessions and users. The downstream fan-out crop math assumes the body occupies a known region of the frame; without standardized capture the per-region crops would drift and the VLM estimates would regress.
 
 7. **Client-side direct upload** -- Images go browser → Vercel Blob directly via a signed, short-lived token. This avoids the 4.5 MB serverless body-size limit and keeps image bytes off the Next.js runtime. The `/api/blob/upload` handler only mints tokens after verifying `scans.user_id` matches the session user and that the pathname matches the canonical `scans/<scanId>/<pose>.jpg` form.
+
+8. **Background pipeline via `after()`** -- The finalize route returns immediately while `after()` (Next.js 15+) runs the LangGraph pipeline in the background. The client polls `/api/scan/[id]/status` every 3 seconds and triggers a `router.refresh()` when the scan reaches `completed` or `failed`.
+
+9. **Region cropping with stable coordinates** -- Bounding boxes are defined in the silhouette viewBox coordinate space (100×177) and scaled to pixel coordinates at crop time. This means the same crop definitions work regardless of the device's camera resolution — the silhouette overlay and the crop math share the same coordinate system.
+
+10. **Provider-agnostic VLM calls** -- The `createVlm()` factory returns a LangChain `BaseChatModel` based on `VLM_PROVIDER` env var. Switching from Gemini to Qwen only requires changing env vars. Qwen is accessed via OpenRouter's OpenAI-compatible endpoint.

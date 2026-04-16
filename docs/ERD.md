@@ -153,13 +153,17 @@ erDiagram
 stateDiagram-v2
     [*] --> uploading: POST /api/scan<br/>(h/w snapshotted)
     uploading --> analyzing: POST /api/scan/[id]/finalize<br/>(both blob URLs present)
-    analyzing --> completed: Phase 3 pipeline success
-    analyzing --> failed: Phase 3 pipeline error<br/>(sets error_message)
+    analyzing --> completed: LangGraph pipeline success<br/>(aggregate node writes results)
+    analyzing --> failed: Pipeline error<br/>(sets error_message)
     uploading --> failed: upload timed out / aborted
 ```
 
 - `pending` is reserved for future flows where a scan row is created before image capture begins; Phase 2 always starts in `uploading`.
-- The finalize endpoint will only accept URLs on `*.public.blob.vercel-storage.com` and only flips status from `uploading`/`pending` (idempotent on retry, safe against race conditions).
+- The finalize endpoint only accepts URLs on `*.public.blob.vercel-storage.com` and only flips status from `uploading`/`pending` (idempotent on retry, safe against race conditions).
+- The LangGraph pipeline is dispatched via `after()` in the finalize route -- the HTTP response returns immediately while analysis proceeds in the background.
+- On completion, the aggregate node writes `feature_analyses`, `body_measurements`, and `scan_results` rows, then flips `scans.status` to `completed`.
+- On error, `runPipeline()` catches the exception and sets `scans.status = 'failed'` with `error_message`.
+- The client polls `GET /api/scan/[id]/status` every 3 seconds and triggers a page refresh on terminal states.
 
 ## Blob Storage Layout
 

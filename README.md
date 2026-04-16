@@ -41,15 +41,16 @@ Height is the only user-provided measurement. All circumferences are estimated f
 | Image Storage | [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) (client-upload) |
 | Database | PostgreSQL on [Neon](https://neon.tech) |
 | Auth | Neon Auth (Google OAuth) |
-| AI Pipeline | LangGraph (LangChain JS) -- fan-out/fan-in graph |
-| LLM Providers | Qwen VL, Google Gemini |
+| AI Pipeline | [LangGraph](https://langchain-ai.github.io/langgraphjs/) (LangChain JS) -- fan-out/fan-in graph |
+| Image Processing | [sharp](https://sharp.pixelplumbing.com/) -- server-side region cropping |
+| LLM Providers | Google Gemini, Qwen VL (via [OpenRouter](https://openrouter.ai)) |
 | Hosting | Vercel |
 
 ## Implementation Status
 
 - [x] **Phase 1** -- Auth (Google OAuth via Neon Auth) + full DB schema with migration runner
 - [x] **Phase 2** -- Profile form, standardized in-browser camera capture with silhouette overlays, Vercel Blob upload pipeline
-- [ ] **Phase 3** -- LangGraph fan-out/fan-in VLM analysis and Navy-formula aggregation
+- [x] **Phase 3** -- LangGraph fan-out/fan-in VLM analysis, Navy-formula aggregation, results page with polling
 - [ ] **Phase 4** -- Dashboard with historical scans and trendline charts
 
 ## Architecture
@@ -91,6 +92,10 @@ npm run dev
 | `NEON_AUTH_BASE_URL` | Neon Auth endpoint URL |
 | `NEON_AUTH_COOKIE_SECRET` | Auth cookie secret (`openssl rand -base64 32`) |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob store token (auto-injected on Vercel when a store is linked; required in `.env.local` for local uploads) |
+| `VLM_PROVIDER` | `gemini` (default) or `qwen` |
+| `VLM_MODEL` | Model name override (default: `gemini-2.0-flash` / `qwen/qwen2.5-vl-72b-instruct`) |
+| `GOOGLE_API_KEY` | Google AI API key (required when `VLM_PROVIDER=gemini`) |
+| `OPENROUTER_API_KEY` | OpenRouter API key (required when `VLM_PROVIDER=qwen`) |
 
 ### Local camera testing
 
@@ -111,18 +116,31 @@ src/
         page.tsx                    # Server: profile-completeness guard
         scan-capture.tsx            # Client: 3-step front/profile/review flow
         silhouette.tsx              # Front + profile silhouette SVGs, alignment grid
-      scan/[id]/                    # Scan results detail (Phase 3)
+      scan/[id]/
+        page.tsx                    # Server: scan results (analyzing/completed/failed)
+        scan-polling.tsx            # Client: 3s polling during analysis
     api/
       auth/[...path]/               # Neon Auth catch-all handler
       profile/                      # POST -- upsert user_profiles
       scan/                         # POST -- create scan (status=uploading, snapshots h/w)
-      scan/[id]/finalize/           # POST -- save blob URLs, flip to status=analyzing
+      scan/[id]/finalize/           # POST -- save blob URLs, dispatch pipeline via after()
+      scan/[id]/status/             # GET -- lightweight status polling endpoint
       blob/upload/                  # handleUpload token handler for @vercel/blob
   lib/
     auth/                           # Auth server + client config
     db.ts                           # Neon SQL client
+    pipeline/
+      state.ts                      # LangGraph state annotation (Annotation.Root)
+      regions.ts                    # 8 body region definitions (bounding boxes + prompts)
+      providers.ts                  # VLM factory (Gemini / Qwen via OpenRouter)
+      crop.ts                       # Node 1: image download + sharp crop per region
+      analyze.ts                    # Nodes 2-9: multimodal VLM call per region (fan-out)
+      aggregate.ts                  # Node 10: weighted avg + Navy formula + DB writes (fan-in)
+      graph.ts                      # Graph wiring, compile, runPipeline() entry point
   db/
-    migrations/                     # Numbered SQL migration files
+    migrations/
+      001_create_schema.sql         # Full DB schema
+      002_seed_analysis_configs.sql # Default male/female feature weights
     migrate.ts                      # Migration runner
 ```
 
@@ -139,10 +157,24 @@ Submit triggers:
 ```
 POST /api/scan                 -> { id }  (status='uploading')
 @vercel/blob upload() x2       -> scans/<id>/{front,profile}.jpg
-POST /api/scan/<id>/finalize   -> status='analyzing' (Phase 3 entry point)
+POST /api/scan/<id>/finalize   -> status='analyzing', response sent immediately
+  └─ after() dispatches LangGraph pipeline in background
+       ├─ crop_images: sharp crops 8 body regions from front image
+       ├─ analyze_region ×8: parallel VLM calls (Gemini or Qwen)
+       └─ aggregate: weighted avg + Navy formula → scan_results
 ```
 
 The captured frame is written un-mirrored even when the user-facing camera is selected, so anatomical left/right stays correct for the downstream VLM.
+
+### Analysis Pipeline
+
+After finalize, the client redirects to `/scan/<id>` which polls `GET /api/scan/<id>/status` every 3 seconds. The LangGraph pipeline runs in the background via Next.js `after()`:
+
+1. **Crop** -- Downloads both images from Vercel Blob, crops 8 body regions using `sharp` based on bounding boxes mapped from the silhouette viewBox (100x177) to actual pixel coordinates.
+2. **Analyze (fan-out)** -- 8 parallel VLM calls, one per region. Each receives a cropped image + a tuned system prompt requesting a JSON response with `local_bf_estimate`, `confidence`, `explanation`, and optionally `circumference_cm`.
+3. **Aggregate (fan-in)** -- Computes weighted average BF% from per-region estimates, Navy formula BF% from circumference estimates, BMI, and writes `feature_analyses`, `body_measurements`, and `scan_results` rows. Sets `scans.status = 'completed'`.
+
+The VLM provider is controlled by `VLM_PROVIDER` env var (`gemini` or `qwen`). Qwen is accessed via [OpenRouter](https://openrouter.ai) since DashScope is unavailable in India.
 
 ## Target Audience
 
