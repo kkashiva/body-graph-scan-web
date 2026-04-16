@@ -135,7 +135,7 @@ export function ScanCapture({ gender }: { gender?: string | null }) {
           overlay={
             <>
               <AlignmentGrid />
-              <ProfileSilhouette />
+              <ProfileSilhouette gender={gender} />
             </>
           }
           headline="Step 2 · Profile pose"

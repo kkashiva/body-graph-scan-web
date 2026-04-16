@@ -93,10 +93,10 @@ export function FrontSilhouette({ gender }: { gender?: string | null }) {
               fill="none"
             />
             {/* ── Boxer briefs fly/seam ── */}
-            <path
+            {/* <path
               d="M 48 88 C 47.5 91, 48 93, 50 95 C 52 93, 52.5 91, 52 88"
               fill="none"
-            />
+            /> */}
           </>
         )}
       </g>
@@ -125,7 +125,17 @@ export function FrontSilhouette({ gender }: { gender?: string | null }) {
   );
 }
 
-export function ProfileSilhouette() {
+export function ProfileSilhouette({ gender }: { gender?: string | null }) {
+  const isFemale = gender === 'female';
+
+  // Generated via Catmull-Rom spline interpolation through anatomical
+  // waypoints (8-head-canon proportions, side view facing right).
+  const MALE_SIDE =
+    'M 48 15 C 51 14, 55 16, 56 19 C 57 21, 58 23, 58.5 25 C 59 26, 57.5 27, 57 27.5 C 56.5 28, 56.5 29, 56 30 C 55.5 31, 55 32, 54 34 C 52 37, 53 40, 55 44 C 57 48, 58 53, 58.5 58 C 59 63, 59 68, 58.5 73 C 58 78, 57.5 83, 57 88 C 56.5 93, 57 98, 57 103 C 57 111, 56.5 119, 56.5 127 C 56.5 135, 56 143, 55.5 151 C 55.5 155, 56 159, 57 162 C 58 164.5, 59 166, 59.5 167 L 40 167 C 39.5 166, 41 164, 42 162 C 43 159, 43.5 155, 44 151 C 44.5 143, 44.5 135, 44 127 C 43.5 119, 43.5 111, 44 103 C 44.5 98, 44.5 93, 44 88 C 43.5 83, 42 78, 41 73 C 40 68, 40 63, 40.5 58 C 41 53, 42 48, 43 44 C 44 40, 44 37, 44 34 C 44 32, 43.5 30, 43 27.5 C 42.5 25, 42 22, 43 18 C 44 15, 46 14, 48 15 Z';
+
+  const FEMALE_SIDE =
+    'M 48 15 C 51 14, 54 16, 55.5 19 C 56.5 21, 57.5 23, 58 25 C 58.5 26, 57 27, 56.5 27.5 C 56 28, 55.5 29, 55.5 30 C 55.5 31, 55 32, 54 34 C 52 37, 53 39, 56 42 C 59 45, 61 48, 62 51 C 62.5 53, 60 56, 57.5 58 C 55 60, 54 64, 54.5 68 C 55 72, 55.5 76, 55.5 80 C 55.5 84, 55 88, 55 92 C 55 97, 55 102, 55 107 C 55 114, 54.5 121, 54.5 128 C 54.5 136, 54 143, 53.5 150 C 53.5 154, 54 158, 55 161 C 56 163.5, 57 165.5, 58 167 L 40 167 C 39.5 165.5, 41 163.5, 42 161 C 43 158, 43.5 154, 43.5 150 C 43.5 143, 44 136, 44 128 C 44 121, 43.5 114, 43 107 C 42.5 102, 42.5 97, 42 92 C 41.5 88, 40 84, 38.5 80 C 37 76, 38 73, 40 70 C 42 67, 43.5 64, 44 61 C 44.5 58, 43.5 54, 42.5 50 C 42 46, 42.5 42, 43.5 39 C 44 37, 44 34, 44 32 C 44 30, 43.5 27.5, 43 25 C 42.5 22, 43 18, 44 15 C 45 13.5, 46.5 14, 48 15 Z';
+
   return (
     <svg
       viewBox={VIEW_BOX}
@@ -138,39 +148,39 @@ export function ProfileSilhouette() {
         stroke="rgba(255, 2, 131, 0.85)"
         strokeWidth="0.6"
         strokeLinejoin="round"
+        strokeLinecap="round"
       >
         {/* Side profile silhouette facing right. */}
-        <path
-          d="
-            M 48 16
-            C 51 15, 54 18, 55 21
-            L 56 23
-            L 58 25
-            L 56 27
-            L 57 29
-            L 55 31
-            L 53 36
-            C 56 42, 61 50, 62 60
-            C 62 75, 60 90, 60 105
-            L 61 148
-            C 50 152, 45 152, 38 148
-            L 35 120
-            C 34 110, 32 105, 34 95
-            C 36 85, 41 78, 40 60
-            C 39 45, 42 38, 44 35
-            L 42 28
-            C 41 22, 43 17, 48 16
-            Z
-          "
-        />
-        {/* Briefs outline */}
-        <path
-          d="
-            M 32 105 L 60 105
-            M 60.5 125 Q 48 115 36 120
-          "
-          fill="none"
-        />
+        <path d={isFemale ? FEMALE_SIDE : MALE_SIDE} />
+
+        {isFemale ? (
+          <>
+            {/* ── Sports bra strap ── */}
+            <path d="M 44 34 C 47 36, 50 38, 54 39" fill="none" />
+            {/* ── Sports bra band ── */}
+            <path d="M 44 57 C 48 58, 54 58, 57.5 57" fill="none" />
+            {/* ── Shorts waistband ── */}
+            <path
+              d="M 39 84 C 44 85.5, 51 85.5, 55 84 M 38.5 87 C 44 88.5, 51 88.5, 55 87"
+              fill="none"
+            />
+            {/* ── Shorts leg opening ── */}
+            <path d="M 42 97 C 46 98.5, 51 98.5, 55 97" fill="none" />
+          </>
+        ) : (
+          <>
+            {/* ── Boxer briefs waistband ── */}
+            <path
+              d="M 44 88 C 48 89.5, 53 89.5, 57 88 M 43.5 91 C 48 92.5, 53 92.5, 56.5 91"
+              fill="none"
+            />
+            {/* ── Boxer briefs leg opening ── */}
+            <path
+              d="M 44 103 C 48 104.5, 53 104.5, 57 103"
+              fill="none"
+            />
+          </>
+        )}
       </g>
       <g>
         <rect
