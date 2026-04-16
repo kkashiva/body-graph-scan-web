@@ -122,7 +122,7 @@ export function ScanCapture({ gender }: { gender?: string | null }) {
             </>
           }
           headline="Step 1 · Front pose"
-          instructions="Face the camera. Arms slightly out, feet shoulder-width. Align your body inside the green silhouette."
+          instructions="Face the camera. Arms slightly out, feet shoulder-width. Align your body inside the silhouette overlay."
           existing={captures.front}
           onCaptured={(cap) => handleCaptured('front', cap)}
           onNext={() => setStep('profile')}
@@ -139,7 +139,7 @@ export function ScanCapture({ gender }: { gender?: string | null }) {
             </>
           }
           headline="Step 2 · Profile pose"
-          instructions="Turn 90° to the side, arms relaxed at your sides. Align your body inside the blue silhouette."
+          instructions="Turn 90° to the side, arms relaxed at your sides. Align your body inside the silhouette overlay."
           existing={captures.profile}
           onCaptured={(cap) => handleCaptured('profile', cap)}
           onBack={() => setStep('front')}
@@ -234,20 +234,18 @@ function Stepper({
         return (
           <li key={it.key} className="flex items-center gap-3">
             <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition-all ${
-                active
+              className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition-all ${active
                   ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                   : it.done
                     ? 'border-green-500 bg-green-500/10 text-green-500'
                     : 'border-border bg-card text-muted-foreground'
-              }`}
+                }`}
             >
               {i + 1}
             </span>
             <span
-              className={`hidden text-sm font-semibold transition-colors sm:inline ${
-                active ? 'text-foreground' : 'text-muted-foreground'
-              }`}
+              className={`hidden text-sm font-semibold transition-colors sm:inline ${active ? 'text-foreground' : 'text-muted-foreground'
+                }`}
             >
               {it.label}
             </span>
@@ -316,7 +314,7 @@ function CameraStep({
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           // Play can reject on iOS if called before user gesture; ignore.
-          videoRef.current.play().catch(() => {});
+          videoRef.current.play().catch(() => { });
         }
       } catch (err) {
         setCameraError(
@@ -391,9 +389,8 @@ function CameraStep({
             autoPlay
             playsInline
             muted
-            className={`h-full w-full object-cover ${
-              facingMode === 'user' ? 'scale-x-[-1]' : ''
-            }`}
+            className={`h-full w-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''
+              }`}
           />
           {overlay}
           {countdown !== null && (
