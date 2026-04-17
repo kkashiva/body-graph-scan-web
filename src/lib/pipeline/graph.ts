@@ -33,6 +33,40 @@ function buildGraph() {
 // Compile once at module load
 const pipeline = buildGraph();
 
+export type PipelineInputs = {
+  scanId: string;
+  frontImageUrl: string;
+  profileImageUrl: string;
+  gender: string;
+  age: number;
+  heightCm: number;
+  weightKg: number;
+  configId: string;
+};
+
+/**
+ * Invoke the compiled graph with already-resolved inputs. Used by both the
+ * standard scan flow (`runPipeline`) and the training-data scoring flow,
+ * which needs to pass the labeled gender rather than the admin's profile
+ * gender.
+ */
+export async function runPipelineWithInputs(
+  inputs: PipelineInputs,
+): Promise<void> {
+  try {
+    await pipeline.invoke(inputs);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Unknown pipeline error';
+    console.error(`[pipeline] Scan ${inputs.scanId} failed:`, message);
+    await sql`
+      UPDATE scans
+      SET status = 'failed', error_message = ${message}
+      WHERE id = ${inputs.scanId}
+    `;
+  }
+}
+
 type ScanRow = {
   front_image_url: string;
   profile_image_url: string;
@@ -114,8 +148,7 @@ export async function runPipeline(scanId: string): Promise<void> {
       UPDATE scans SET analysis_config_id = ${configId} WHERE id = ${scanId}
     `;
 
-    // Run the graph
-    await pipeline.invoke({
+    await runPipelineWithInputs({
       scanId,
       frontImageUrl: scan.front_image_url,
       profileImageUrl: scan.profile_image_url,

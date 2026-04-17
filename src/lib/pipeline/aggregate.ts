@@ -1,37 +1,9 @@
 import { sql } from '@/lib/db';
 import { REGIONS } from './regions';
-import type { AnalysisResult, FinalResult, GraphStateType } from './state';
+import { navyBodyFat } from './navy';
+import type { FinalResult, GraphStateType } from './state';
 
 type FeatureWeight = { feature_name: string; weight: number; id: string };
-
-/**
- * US Navy body-fat formula.
- */
-function navyBodyFat(
-  gender: string,
-  neckCm: number,
-  waistCm: number,
-  hipCm: number | undefined,
-  heightCm: number,
-): number | null {
-  if (gender === 'male') {
-    if (waistCm <= neckCm) return null;
-    return (
-      86.01 * Math.log10(waistCm - neckCm) -
-      70.041 * Math.log10(heightCm) +
-      36.76
-    );
-  }
-  if (gender === 'female') {
-    if (!hipCm || waistCm + hipCm <= neckCm) return null;
-    return (
-      163.205 * Math.log10(waistCm + hipCm - neckCm) -
-      97.684 * Math.log10(heightCm) +
-      78.387
-    );
-  }
-  return null;
-}
 
 /**
  * Aggregator node — computes final BF%, writes all results to DB.
