@@ -51,7 +51,8 @@ Height is the only user-provided measurement. All circumferences are estimated f
 - [x] **Phase 1** -- Auth (Google OAuth via Neon Auth) + full DB schema with migration runner
 - [x] **Phase 2** -- Profile form, standardized in-browser camera capture with silhouette overlays, Vercel Blob upload pipeline
 - [x] **Phase 3** -- LangGraph fan-out/fan-in VLM analysis, Navy-formula aggregation, results page with polling
-- [ ] **Phase 4** -- Dashboard with historical scans and trendline charts
+- [x] **Phase 4** -- Dashboard with historical scans and trendline charts (Recharts)
+- [x] **Phase 5** -- Admin "ML weight refinement" loop: upload labeled training images, score via the production pipeline, run coordinate-descent optimizer over `feature_weights` to minimize MSE vs known BF%, promote the best config live
 
 ## Architecture
 
@@ -82,6 +83,11 @@ npm run db:migrate
 
 # Start development server
 npm run dev
+
+# (Optional) Run the offline weight optimizer once you've uploaded
+# labeled training scans through /admin/training
+npm run optimize:weights -- --gender male
+npm run optimize:weights -- --gender female --persist
 ```
 
 ### Environment Variables
@@ -97,6 +103,16 @@ npm run dev
 | `GOOGLE_API_KEY` | Google AI API key (required when `VLM_PROVIDER=gemini`) |
 | `OPENROUTER_API_KEY` | OpenRouter API key (required when `VLM_PROVIDER=qwen`) |
 
+### Admin access
+
+The `/admin/training` and `/admin/optimize` pages are gated by `user_profiles.is_admin`. There is no UI for self-promotion — set the flag directly in Neon Studio:
+
+```sql
+UPDATE user_profiles SET is_admin = true WHERE user_id = '<your-uuid>';
+```
+
+The header shows `Training` and `Optimize` links only for admins; regular users won't see them and direct navigation to `/admin/*` returns 404.
+
 ### Local camera testing
 
 `getUserMedia` is gated to secure contexts. `http://localhost:3000` counts as secure, so `npm run dev` works without extra setup. If you need to test from another device on your LAN, front the dev server with an HTTPS tunnel.
@@ -109,6 +125,9 @@ src/
     login/                          # Google OAuth sign-in
     (authenticated)/                # Protected routes
       dashboard/                    # Scan history + trendline charts (Phase 4)
+      admin/
+        training/                   # Upload labeled scans + "Score all" action (Phase 5)
+        optimize/                   # Run optimizer, compare weight vectors, promote (Phase 5)
       profile/
         page.tsx                    # Server: loads user_profiles
         profile-form.tsx            # Client: gender / DOB / height / weight
@@ -126,9 +145,14 @@ src/
       scan/[id]/finalize/           # POST -- save blob URLs, dispatch pipeline via after()
       scan/[id]/status/             # GET -- lightweight status polling endpoint
       blob/upload/                  # handleUpload token handler for @vercel/blob
+      admin/
+        training/                   # POST upload (blob token), POST insert training_scan,
+                                    #   POST score-all (runs pipeline against each unscored row)
+        optimize/                   # POST run optimizer, POST promote candidate config
   lib/
     auth/                           # Auth server + client config
     db.ts                           # Neon SQL client
+    admin.ts                        # DB-backed isAdmin(userId) gate (Phase 5)
     pipeline/
       state.ts                      # LangGraph state annotation (Annotation.Root)
       regions.ts                    # 8 body region definitions (bounding boxes + prompts)
@@ -136,11 +160,18 @@ src/
       crop.ts                       # Node 1: image download + sharp crop per region
       analyze.ts                    # Nodes 2-9: multimodal VLM call per region (fan-out)
       aggregate.ts                  # Node 10: weighted avg + Navy formula + DB writes (fan-in)
-      graph.ts                      # Graph wiring, compile, runPipeline() entry point
+      navy.ts                       # Shared Navy-formula helper (used by aggregator + optimizer)
+      graph.ts                      # Graph wiring, runPipeline / runPipelineWithInputs
+    optimize/
+      weight-optimizer.ts           # Pure coordinate-descent over the weight vector (Phase 5)
+      load-samples.ts               # Build OptimizerSample[] from scored training scans
+  scripts/
+    optimize-weights.ts             # CLI entry for `npm run optimize:weights`
   db/
     migrations/
       001_create_schema.sql         # Full DB schema
       002_seed_analysis_configs.sql # Default male/female feature weights
+      003_phase5_training.sql       # is_admin flag, training_scan linkage, run snapshot cols
     migrate.ts                      # Migration runner
 ```
 
@@ -175,6 +206,17 @@ After finalize, the client redirects to `/scan/<id>` which polls `GET /api/scan/
 3. **Aggregate (fan-in)** -- Computes weighted average BF% from per-region estimates, Navy formula BF% from circumference estimates, BMI, and writes `feature_analyses`, `body_measurements`, and `scan_results` rows. Sets `scans.status = 'completed'`.
 
 The VLM provider is controlled by `VLM_PROVIDER` env var (`gemini` or `qwen`). Qwen is accessed via [OpenRouter](https://openrouter.ai) since DashScope is unavailable in India.
+
+## Weight Optimization (Phase 5)
+
+The aggregator blends a weighted average of per-region BF estimates (50%) with the Navy-formula estimate (50%). The 8 weights originally came from hand-tuned guesses seeded in `002_seed_analysis_configs.sql`. Phase 5 refines those weights against ground truth:
+
+1. **Upload labeled data** at `/admin/training`: front + profile photos, known BF% (from DEXA / BodPod / hydrostatic weighing), gender, optional height / weight, and a free-text source.
+2. **Score** each unscored row — clicking "Score all" creates a synthetic `scans` row per training sample and runs the same LangGraph pipeline used in production, so per-region estimates land in `feature_analyses` and circumferences land in `body_measurements`.
+3. **Optimize** at `/admin/optimize`: coordinate-descent search over the weight vector starting from the currently-active config, transferring probability mass between region pairs and accepting the best improving move each pass. Loss function mirrors the aggregator's 50/50 Navy blend exactly (see `src/lib/optimize/weight-optimizer.ts`).
+4. **Promote** the candidate: toggling `is_active` via the partial unique index on `analysis_configs(gender_target) WHERE is_active = true` atomically swaps the live config. The next real scan picks up the new weights.
+
+Because per-region estimates are persisted after scoring, the optimizer runs in milliseconds — no additional VLM calls. The CLI `npm run optimize:weights` mirrors the in-app flow for demos and headless runs.
 
 ## Target Audience
 

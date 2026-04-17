@@ -23,6 +23,7 @@ erDiagram
         DATE date_of_birth
         NUMERIC height_cm
         NUMERIC weight_kg
+        BOOLEAN is_admin "gates /admin/* — set manually in Neon"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -96,7 +97,8 @@ erDiagram
 
     TRAINING_SCANS {
         UUID id PK
-        UUID user_id FK "nullable"
+        UUID user_id FK "nullable — admin uploader"
+        UUID scan_id FK "nullable — links to scored scans row"
         TEXT front_image_url
         TEXT profile_image_url
         NUMERIC known_bf_pct "ground truth"
@@ -104,15 +106,20 @@ erDiagram
         NUMERIC height_cm
         NUMERIC weight_kg
         TEXT source "dexa | bodpod | user_reported"
+        TIMESTAMPTZ scored_at "when pipeline ran"
         TIMESTAMPTZ created_at
     }
 
     WEIGHT_OPTIMIZATION_RUNS {
         UUID id PK
-        UUID config_id_produced FK "nullable"
+        UUID config_id_produced FK "nullable — candidate config written"
+        TEXT gender_target "male | female"
         INTEGER training_scan_count
+        NUMERIC baseline_mse "MSE of active weights on this sample"
+        NUMERIC mean_squared_error "final MSE after optimization"
         NUMERIC mean_absolute_error
-        NUMERIC mean_squared_error
+        JSONB final_weights "snapshot of the optimized vector"
+        INTEGER iterations "accepted coordinate-descent moves"
         TEXT notes
         TIMESTAMPTZ started_at
         TIMESTAMPTZ completed_at
@@ -133,6 +140,7 @@ erDiagram
     ANALYSIS_CONFIGS ||--o{ FEATURE_WEIGHTS : "contains"
     FEATURE_WEIGHTS ||--o{ FEATURE_ANALYSES : "applied in"
 
+    TRAINING_SCANS }o--o| SCANS : "scored via synthetic scan"
     WEIGHT_OPTIMIZATION_RUNS }o--o| ANALYSIS_CONFIGS : "produces"
 ```
 
@@ -144,6 +152,9 @@ erDiagram
 - **`feature_analyses`** is the bridge between the LangGraph pipeline and the database -- each fan-out node writes one row, the fan-in node reads all rows for a scan to produce `scan_results`.
 - **`raw_llm_response`** (JSONB) stores full VLM output for debugging and retraining.
 - **`weight_applied`** is denormalized into `feature_analyses` so results are auditable even if the config changes later.
+- **`training_scans.scan_id`** (Phase 5) points at a synthetic `scans` row used purely for scoring — this lets the Phase 5 optimizer read per-region estimates from the same `feature_analyses` table the live pipeline writes to, no duplicate storage.
+- **`weight_optimization_runs.final_weights`** (JSONB) snapshots the candidate vector. The `config_id_produced` FK points at a new inactive `analysis_configs` row; promotion just flips `is_active`.
+- **`user_profiles.is_admin`** is toggled manually via `UPDATE user_profiles SET is_admin = true WHERE user_id = '<uuid>';`. There is no UI for self-promotion — this keeps the hackathon demo surface small and auditable.
 
 ## Scan Status Lifecycle
 

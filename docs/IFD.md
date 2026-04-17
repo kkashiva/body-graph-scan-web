@@ -235,25 +235,84 @@ sequenceDiagram
     App-->>U: Render dashboard
 ```
 
-## Training / Weight Optimization Flow
+## Weight Optimization Flow (Phase 5)
+
+Phase 5 is a two-stage loop: **score** labeled training samples through the production pipeline (one-time VLM cost per sample), then **optimize** the weight vector offline against the stored per-region estimates. Because weights only enter the final prediction through a linear blend, optimization runs in milliseconds without calling the VLM again.
 
 ```mermaid
 flowchart TD
-    subgraph TRAINING["Training Pipeline"]
-        T1[Labeled dataset: images + known BF%] --> T2[Load training_scans from DB]
-        T2 --> T3[Run fan-out pipeline on each image]
-        T3 --> T4[Collect per-region estimates vs ground truth]
-        T4 --> T5[Optimize feature_weights to minimize error]
-        T5 --> T6[Create new analysis_config with tuned weights]
-        T6 --> T7[Record weight_optimization_run with MAE/MSE]
-        T7 --> T8{Accuracy acceptable?}
-        T8 -->|Yes| T9[Set new config as is_active]
-        T8 -->|No| T10[Adjust features / add regions / retrain]
-        T10 --> T3
+    subgraph INGEST["1. Data Ingest (Admin)"]
+        U1[Admin uploads labeled photos at /admin/training] --> U2[POST /api/admin/training/upload<br/>Vercel Blob token]
+        U2 --> U3["Direct upload to training/&lt;tempId&gt;/{front,profile}.jpg"]
+        U3 --> U4[POST /api/admin/training<br/>INSERT training_scans row]
     end
 
-    style TRAINING fill:#fce4ec,stroke:#E91E63
+    subgraph SCORE["2. Score via Production Pipeline"]
+        U4 --> S1[Admin clicks 'Score all unscored']
+        S1 --> S2[POST /api/admin/training/score-all]
+        S2 --> S3{For each training_scan<br/>where scan_id IS NULL}
+        S3 --> S4[INSERT synthetic scans row<br/>owned by admin]
+        S4 --> S5[runPipelineWithInputs with LABELED gender<br/>not admin's profile gender]
+        S5 --> S6[Pipeline writes feature_analyses,<br/>body_measurements, scan_results]
+        S6 --> S7[UPDATE training_scans SET scan_id, scored_at]
+        S7 --> S3
+    end
+
+    subgraph OPTIMIZE["3. Optimize Weight Vector"]
+        O1[Admin clicks 'Optimize male' at /admin/optimize] --> O2[POST /api/admin/optimize]
+        O2 --> O3[loadSamples: JOIN training_scans →<br/>feature_analyses + body_measurements]
+        O3 --> O4[Recompute Navy BF from stored circumferences<br/>via shared navy.ts helper]
+        O4 --> O5[Coordinate descent:<br/>transfer weight between region pairs,<br/>keep best MSE-improving move]
+        O5 --> O6{MSE improved?}
+        O6 -->|Yes| O7[Accept move, continue]
+        O6 -->|No| O8[Halve step size]
+        O7 --> O5
+        O8 --> O5
+        O5 --> O9[Converged — step < minStep]
+    end
+
+    subgraph PROMOTE["4. Persist + Promote"]
+        O9 --> P1[INSERT new analysis_configs row<br/>is_active=false, gender_target=X]
+        P1 --> P2[INSERT feature_weights rows<br/>from optimized vector]
+        P2 --> P3[INSERT weight_optimization_runs<br/>baseline_mse, final_mse, MAE, iterations]
+        P3 --> P4{Admin reviews bar chart<br/>current vs candidate}
+        P4 -->|Promote| P5[POST /api/admin/optimize/promote<br/>flip is_active]
+        P4 -->|Keep candidate| P6[No-op — candidate stays inactive]
+        P5 --> P7[Next real scan picks up<br/>new weights via gender_target lookup]
+    end
+
+    style INGEST fill:#f3e5f5,stroke:#9C27B0
+    style SCORE fill:#fff3e0,stroke:#FF9800
+    style OPTIMIZE fill:#e8f5e9,stroke:#4CAF50
+    style PROMOTE fill:#fce4ec,stroke:#E91E63
 ```
+
+### Loss function
+
+The optimizer's predicted BF for a sample mirrors `aggregate.ts` exactly:
+
+```
+visual_bf = Σ(w_r × local_bf_estimate_r) / Σ(w_r)   for regions with w_r > 0
+navy_bf   = navyBodyFat(gender, neck, waist, hips, height)   # from shared navy.ts
+
+predicted = 0.5 × visual_bf + 0.5 × navy_bf       if navy valid
+          | visual_bf                              if navy invalid
+          | 20                                     fallback
+predicted = clamp(predicted, 3, 55)
+```
+
+`MSE = mean((predicted - known_bf_pct)²)` over all scored training samples for the selected gender.
+
+### Admin gate
+
+`/admin/*` pages and `/api/admin/*` routes all do:
+```ts
+const { user } = await neonAuth();
+if (!user) redirect('/login');
+if (!(await isAdmin(user.id))) notFound();   // pages — hide their existence
+if (!(await isAdmin(user.id))) return 403;   // API routes
+```
+`isAdmin` reads `user_profiles.is_admin`, which is toggled manually in Neon Studio.
 
 ## Key Design Principles
 
