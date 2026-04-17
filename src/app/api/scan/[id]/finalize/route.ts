@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { neonAuth } from '@neondatabase/auth/next/server';
 import { sql } from '@/lib/db';
+import { runPipeline } from '@/lib/pipeline/graph';
 
 type Body = {
   frontImageUrl?: string;
@@ -58,7 +59,10 @@ export async function POST(
     );
   }
 
-  // Phase 3 will dispatch the LangGraph pipeline here.
+  // Dispatch the LangGraph analysis pipeline after the response is sent.
+  after(async () => {
+    await runPipeline(id);
+  });
 
   return NextResponse.json({ id: rows[0].id });
 }
