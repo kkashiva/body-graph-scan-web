@@ -54,7 +54,7 @@ export function WeightComparison({
               borderRadius: 8,
               fontSize: 12,
             }}
-            formatter={(v: number) => `${v}%`}
+            formatter={(v) => `${v}%`}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Bar dataKey="current" fill="var(--muted-foreground)" name="Active" />
