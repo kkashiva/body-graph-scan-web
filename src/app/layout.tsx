@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
+import { neonAuth } from "@neondatabase/auth/next/server";
 import { LogoutButton } from "./logout-button";
+import { isAdmin } from "@/lib/admin";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,11 +22,14 @@ export const metadata: Metadata = {
     "Estimate your body fat percentage and measurements from front and profile body photos using AI.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { user } = await neonAuth();
+  const admin = user ? await isAdmin(user.id) : false;
+
   return (
     <html
       lang="en"
@@ -48,6 +53,17 @@ export default function RootLayout({
                 <Link href="/profile" className="text-muted-foreground transition-colors hover:text-primary">
                   Profile
                 </Link>
+                {admin && (
+                  <>
+                    <span className="h-4 w-px bg-border" aria-hidden />
+                    <Link href="/admin/training" className="text-muted-foreground transition-colors hover:text-primary">
+                      Training
+                    </Link>
+                    <Link href="/admin/optimize" className="text-muted-foreground transition-colors hover:text-primary">
+                      Optimize
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
             <LogoutButton />
