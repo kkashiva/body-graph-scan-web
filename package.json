@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "optimize:weights": "tsx src/scripts/optimize-weights.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.1.40",
