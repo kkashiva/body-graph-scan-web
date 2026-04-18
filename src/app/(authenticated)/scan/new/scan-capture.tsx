@@ -17,6 +17,9 @@ import {
 
 type Pose = 'front' | 'profile';
 type Step = 'front' | 'profile' | 'review';
+type CaptureMode = 'camera' | 'upload';
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // matches /api/blob/upload cap
 
 type Captured = {
   blob: Blob;
@@ -26,6 +29,7 @@ type Captured = {
 export function ScanCapture({ gender }: { gender?: string | null }) {
   const router = useRouter();
 
+  const [mode, setMode] = useState<CaptureMode>('camera');
   const [step, setStep] = useState<Step>('front');
   const [captures, setCaptures] = useState<Record<Pose, Captured | null>>({
     front: null,
@@ -108,6 +112,60 @@ export function ScanCapture({ gender }: { gender?: string | null }) {
     }
   }
 
+  function switchMode(next: CaptureMode) {
+    if (next === mode) return;
+    setSubmitError('');
+    setMode(next);
+    if (next === 'camera') setStep('front');
+  }
+
+  return (
+    <div className="space-y-6">
+      <ModeToggle mode={mode} onChange={switchMode} />
+
+      {mode === 'upload' ? (
+        <UploadStep
+          captures={captures}
+          onCaptured={handleCaptured}
+          onSubmit={submit}
+          submitting={submitting}
+          submitError={submitError}
+        />
+      ) : (
+        <CameraFlow
+          step={step}
+          setStep={setStep}
+          captures={captures}
+          handleCaptured={handleCaptured}
+          submit={submit}
+          submitting={submitting}
+          submitError={submitError}
+          gender={gender}
+        />
+      )}
+    </div>
+  );
+}
+
+function CameraFlow({
+  step,
+  setStep,
+  captures,
+  handleCaptured,
+  submit,
+  submitting,
+  submitError,
+  gender,
+}: {
+  step: Step;
+  setStep: (s: Step) => void;
+  captures: Record<Pose, Captured | null>;
+  handleCaptured: (pose: Pose, cap: Captured) => void;
+  submit: () => Promise<void>;
+  submitting: boolean;
+  submitError: string;
+  gender?: string | null;
+}) {
   return (
     <div className="space-y-6">
       <Stepper step={step} captures={captures} />
@@ -211,6 +269,221 @@ export function ScanCapture({ gender }: { gender?: string | null }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ModeToggle — switches between live camera capture and file upload.
+// ---------------------------------------------------------------------------
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: CaptureMode;
+  onChange: (m: CaptureMode) => void;
+}) {
+  const options: { value: CaptureMode; label: string; sub: string }[] = [
+    { value: 'camera', label: 'Live camera', sub: 'Capture with your device camera' },
+    { value: 'upload', label: 'Upload files', sub: 'Pick existing photos from disk' },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Capture mode"
+      className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-2"
+    >
+      {options.map((opt) => {
+        const active = opt.value === mode;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={`cursor-pointer rounded-xl px-4 py-3 text-left transition-all ${
+              active
+                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            <div className="text-sm font-bold">{opt.label}</div>
+            <div
+              className={`mt-0.5 text-xs ${active ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
+            >
+              {opt.sub}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// UploadStep — single-screen file-picker form for both poses. Reuses the same
+// Captured state and submit() as the camera flow.
+// ---------------------------------------------------------------------------
+
+function UploadStep({
+  captures,
+  onCaptured,
+  onSubmit,
+  submitting,
+  submitError,
+}: {
+  captures: Record<Pose, Captured | null>;
+  onCaptured: (pose: Pose, cap: Captured) => void;
+  onSubmit: () => Promise<void>;
+  submitting: boolean;
+  submitError: string;
+}) {
+  const [localError, setLocalError] = useState('');
+
+  function handleFile(pose: Pose, file: File | null) {
+    setLocalError('');
+    if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setLocalError(
+        `${pose} image is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 10 MB`,
+      );
+      return;
+    }
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setLocalError(`${pose} image must be JPEG, PNG, or WebP`);
+      return;
+    }
+    onCaptured(pose, { blob: file, url: URL.createObjectURL(file) });
+  }
+
+  const bothReady = !!captures.front && !!captures.profile;
+  const error = localError || submitError;
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <h2 className="text-xl font-bold tracking-tight text-foreground">
+        Upload photos
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Pick a front-pose and profile-pose photo from your device. JPEG, PNG, or
+        WebP up to 10 MB each.
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+        {(['front', 'profile'] as Pose[]).map((pose) => (
+          <UploadSlot
+            key={pose}
+            pose={pose}
+            captured={captures[pose]}
+            onFile={(f) => handleFile(pose, f)}
+          />
+        ))}
+      </div>
+
+      {error && (
+        <div className="mt-6 rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-8 flex gap-3">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!bothReady || submitting}
+          className="flex-1 cursor-pointer rounded-xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 sm:flex-none"
+        >
+          {submitting
+            ? 'Uploading…'
+            : bothReady
+              ? 'Submit for analysis'
+              : 'Select both photos to continue'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function UploadSlot({
+  pose,
+  captured,
+  onFile,
+}: {
+  pose: Pose;
+  captured: Captured | null;
+  onFile: (f: File | null) => void;
+}) {
+  const inputId = `upload-${pose}`;
+  const labels: Record<Pose, { title: string; hint: string }> = {
+    front: { title: 'Front pose', hint: 'Facing camera, arms slightly out' },
+    profile: { title: 'Profile pose', hint: '90° side view, arms relaxed' },
+  };
+  const meta = labels[pose];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{meta.title}</p>
+          <p className="text-xs text-muted-foreground">{meta.hint}</p>
+        </div>
+        {captured && (
+          <label
+            htmlFor={inputId}
+            className="cursor-pointer text-xs font-medium text-primary underline hover:text-primary/80"
+          >
+            Replace
+          </label>
+        )}
+      </div>
+
+      <label
+        htmlFor={inputId}
+        className={`group relative flex aspect-[9/16] w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card transition-colors ${
+          captured
+            ? 'border-border'
+            : 'border-border hover:border-primary/50 hover:bg-accent/40'
+        }`}
+      >
+        {captured ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={captured.url}
+            alt={`${pose} preview`}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-2 p-6 text-center text-muted-foreground">
+            <svg
+              className="h-10 w-10"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5m0 0L7.5 12M12 7.5V21"
+              />
+            </svg>
+            <span className="text-sm font-semibold text-foreground">
+              Tap to choose a photo
+            </span>
+            <span className="text-xs">JPEG, PNG, or WebP · up to 10 MB</span>
+          </div>
+        )}
+      </label>
+
+      <input
+        id={inputId}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+      />
     </div>
   );
 }
