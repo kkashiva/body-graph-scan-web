@@ -6,6 +6,14 @@ import { BodyFatTrend, type TrendPoint } from './body-fat-trend';
 
 type TrendRow = TrendPoint & { id: string };
 
+type LatestMeasurement = {
+  region: string;
+  value_cm: number;
+  is_primary: boolean;
+};
+
+const HEADLINE_REGIONS = ['neck', 'waist', 'hips', 'chest'] as const;
+
 const cardDate = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
   month: 'short',
@@ -61,6 +69,20 @@ export default async function DashboardPage() {
 
   const recent = [...rows].reverse().slice(0, 10);
 
+  const allLatestMeasurements = (await sql`
+    SELECT region, value_cm::float AS value_cm, is_primary
+    FROM body_measurements
+    WHERE scan_id = ${latest.id}
+  `) as LatestMeasurement[];
+
+  const measurementsByRegion = new Map(
+    allLatestMeasurements.map((m) => [m.region, m]),
+  );
+  const latestMeasurements = HEADLINE_REGIONS
+    .map((r) => measurementsByRegion.get(r))
+    .filter((m): m is LatestMeasurement => !!m);
+  const latestDate = cardDate.format(new Date(latest.completed_at));
+
   return (
     <div className="space-y-8 pb-12">
       <div>
@@ -96,6 +118,37 @@ export default async function DashboardPage() {
           sub="completed"
         />
       </div>
+
+      {latestMeasurements.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-foreground">
+            Latest Body Measurements
+          </h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {HEADLINE_REGIONS.map((region) => {
+              const m = measurementsByRegion.get(region);
+              if (!m) {
+                return (
+                  <MetricCard
+                    key={region}
+                    label={region}
+                    value="—"
+                    sub="not detected"
+                  />
+                );
+              }
+              return (
+                <MetricCard
+                  key={region}
+                  label={region}
+                  value={`${m.value_cm} cm`}
+                  sub={`from ${latestDate}`}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-foreground">
