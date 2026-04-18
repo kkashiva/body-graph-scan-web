@@ -6,8 +6,11 @@
 flowchart TD
     subgraph USER_INPUT["1. User Input"]
         A[User fills /profile: gender, DOB, height, weight] --> A2[upsert into user_profiles]
-        A2 --> B[Camera capture at /scan/new with silhouette overlay]
-        B --> B2[Front pose + Profile pose captured to JPEG blobs]
+        A2 --> MODE{Capture mode toggle on /scan/new}
+        MODE -->|Live camera| B[Camera capture with silhouette overlay]
+        MODE -->|Upload files| BU[File picker: JPEG/PNG/WebP up to 10 MB each]
+        B --> B2[Front pose + Profile pose as image blobs]
+        BU --> B2
     end
 
     subgraph PREPROCESSING["2. Preprocessing"]
@@ -154,6 +157,9 @@ sequenceDiagram
 ```
 
 ## Capture & Upload Flow (Phase 2)
+
+> The diagram below shows the live-camera path. The upload-files mode is identical from `POST /api/scan` onward; it just replaces the `getUserMedia` + `canvas.toBlob` capture loop with a `<input type="file">` picker that produces the same `Blob` for each pose. Both modes share the same `submit()` function in `scan-capture.tsx` and the same downstream pipeline.
+
 
 ```mermaid
 sequenceDiagram

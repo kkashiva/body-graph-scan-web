@@ -7,11 +7,13 @@ Measuring body fat % typically requires specialized, expensive equipment (DEXA s
 ## How It Works
 
 1. **User fills in** gender, date of birth, height, and weight on `/profile`.
-2. **User captures** a front-facing and side-profile photo using the in-browser camera. A translucent silhouette + alignment grid overlay on the live video feed guides consistent framing so the downstream crop/fan-out logic behaves the same for every scan.
+2. **User provides** a front-facing and side-profile photo via either of two modes on `/scan/new`:
+   - **Live camera** (default) — in-browser capture with a translucent silhouette + alignment grid overlay so the downstream crop/fan-out logic sees consistent framing.
+   - **Upload files** — pick existing JPEG/PNG/WebP photos from disk (up to 10 MB each). Useful for validating against datasets with known ground-truth measurements.
 3. **Photos upload directly** to Vercel Blob from the browser (bypassing serverless body-size limits) under a per-scan namespace (`scans/<scanId>/{front,profile}.jpg`).
 4. **AI graph pipeline** (Phase 3) breaks each image into isolated body regions (jawline, neck, triceps, belly, love handles, forearms, etc.) and analyzes each one independently using a Vision-Language Model.
 5. **Fan-in aggregation** combines per-region estimates with configurable weights to produce a final body fat % and circumference measurements.
-6. **Results are stored** so users can track their body composition trends over time with charts.
+6. **Results are stored** so users can track their body composition trends over time. The scan results page surfaces the headline circumferences (neck, waist, hips, chest) alongside BF%, and the dashboard shows the latest measurements next to the BF% trendline.
 
 ### Why a Graph Architecture?
 
@@ -133,7 +135,7 @@ src/
         profile-form.tsx            # Client: gender / DOB / height / weight
       scan/new/
         page.tsx                    # Server: profile-completeness guard
-        scan-capture.tsx            # Client: 3-step front/profile/review flow
+        scan-capture.tsx            # Client: live-camera 3-step flow + upload-files single-screen flow
         silhouette.tsx              # Front + profile silhouette SVGs, alignment grid
       scan/[id]/
         page.tsx                    # Server: scan results (analyzing/completed/failed)
@@ -177,11 +179,15 @@ src/
 
 ## Scan Capture Flow
 
-The `/scan/new` experience is a three-step client flow, gated server-side on profile completeness:
+The `/scan/new` experience is gated server-side on profile completeness and offers two capture modes via a top-level toggle:
+
+**Live camera (default)** — three-step client flow:
 
 1. **Front pose** -- Live camera with a green body silhouette overlay and rule-of-thirds grid. User aligns body inside the silhouette; a 3-second countdown gives time to settle before the canvas grab.
 2. **Profile (side) pose** -- Same UI with a blue side-profile silhouette.
 3. **Review** -- Thumbnails of both captures with retake buttons; Submit sends both images through the upload pipeline.
+
+**Upload files** — single-screen flow with two file slots (JPEG/PNG/WebP, ≤10 MB each). Inline previews replace the review step; the slots feed the same `captures` state used by the camera flow, so submit goes through the identical pipeline. This mode is ideal for testing against known-measurement reference photos without needing to physically pose.
 
 Submit triggers:
 
