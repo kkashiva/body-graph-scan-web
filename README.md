@@ -32,6 +32,80 @@ Inspired by the **US Navy circumference method**, which estimates body fat from 
 
 Height is the only user-provided measurement. All circumferences are estimated from the photos.
 
+```mermaid
+flowchart TD
+    %% ================= Input =================
+    FRONT["📷 Front pose<br/>(JPEG)"]:::input
+    PROFILE["📷 Profile pose<br/>(JPEG)"]:::input
+
+    FRONT --> CROP
+    PROFILE --> CROP
+
+    CROP["🪚 crop_images node<br/>sharp.extract × 8 regions<br/>silhouette viewBox → pixels"]:::node
+
+    %% ================= Fan-Out: 8 parallel VLM calls =================
+    CROP -->|Send| R1
+    CROP -->|Send| R2
+    CROP -->|Send| R3
+    CROP -->|Send| R4
+    CROP -->|Send| R5
+    CROP -->|Send| R6
+    CROP -->|Send| R7
+    CROP -->|Send| R8
+
+    subgraph FANOUT["⚡ Fan-Out — 8 parallel Qwen VL calls"]
+        direction LR
+        R1["Jawline / Chin<br/>→ local_bf %"]:::visual
+        R2["Neck<br/>→ local_bf % + neck cm"]:::both
+        R3["Triceps / Arms<br/>→ local_bf %"]:::visual
+        R4["Chest<br/>→ local_bf % + chest cm"]:::both
+        R5["Belly / Love Handles<br/>→ local_bf %"]:::visual
+        R6["Waist / Navel<br/>→ local_bf % + waist cm"]:::both
+        R7["Hips<br/>→ local_bf % + hip cm"]:::both
+        R8["Forearm Vascularity<br/>→ local_bf %"]:::visual
+    end
+
+    %% ================= Fan-In routing =================
+    R1 --> WEIGHTED
+    R2 --> WEIGHTED
+    R3 --> WEIGHTED
+    R4 --> WEIGHTED
+    R5 --> WEIGHTED
+    R6 --> WEIGHTED
+    R7 --> WEIGHTED
+    R8 --> WEIGHTED
+
+    R2 --> NAVY
+    R4 --> NAVY
+    R6 --> NAVY
+    R7 --> NAVY
+
+    %% ================= Fan-In: 2 independent estimators =================
+    subgraph FANIN["🧮 Fan-In — aggregate node"]
+        direction LR
+        WEIGHTED["Σ w_r × local_bf_r / Σ w_r<br/>(learned weights per gender)"]:::agg
+        NAVY["US Navy formula<br/>log(waist ± neck [± hips]) · height"]:::agg
+    end
+
+    WEIGHTED --> BLEND
+    NAVY --> BLEND
+
+    BLEND{"50 / 50 blend<br/>clamp 3–55 %"}:::blend
+
+    BLEND --> OUT
+
+    OUT["📊 scan_results<br/>body_fat_pct · confidence · method"]:::output
+
+    %% ================= Styling =================
+    classDef input   fill:#1E3A8A,stroke:#93C5FD,stroke-width:2px,color:#FFFFFF
+    classDef node    fill:#334155,stroke:#94A3B8,stroke-width:1px,color:#F1F5F9
+    classDef visual  fill:#7C2D12,stroke:#FDBA74,stroke-width:1px,color:#FFEDD5
+    classDef both    fill:#78350F,stroke:#F59E0B,stroke-width:2px,color:#FEF3C7
+    classDef agg     fill:#064E3B,stroke:#6EE7B7,stroke-width:1px,color:#D1FAE5
+    classDef blend   fill:#581C87,stroke:#D8B4FE,stroke-width:2px,color:#F3E8FF
+    classDef output  fill:#0F172A,stroke:#F59E0B,stroke-width:3px,color:#FFFFFF
+```
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -58,7 +132,261 @@ Height is the only user-provided measurement. All circumferences are estimated f
 
 See detailed diagrams:
 - [Database ERD](docs/ERD.md)
+```mermaid
+---
+config:
+  layout: dagre
+---
+erDiagram
+    NEON_AUTH_USER {
+        UUID id PK
+        TEXT email
+        TEXT name
+        JSONB raw_json
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+    USER_PROFILES {
+        UUID user_id PK, FK
+        TEXT gender "male | female | other"
+        DATE date_of_birth
+        NUMERIC height_cm
+        NUMERIC weight_kg
+        BOOLEAN is_admin "gates /admin/* — set manually in Neon"
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    ANALYSIS_CONFIGS {
+        UUID id PK
+        TEXT name "e.g. v1-male-default"
+        TEXT description
+        TEXT gender_target "male | female | any"
+        BOOLEAN is_active "partial unique per gender"
+        TIMESTAMPTZ created_at
+    }
+
+    FEATURE_WEIGHTS {
+        UUID id PK
+        UUID config_id FK
+        TEXT feature_name "jawline, neck, triceps, belly..."
+        NUMERIC weight "0.000 - 1.000"
+        TIMESTAMPTZ created_at
+    }
+
+    SCANS {
+        UUID id PK
+        UUID user_id FK
+        UUID analysis_config_id FK "nullable"
+        TEXT status "pending | uploading | analyzing | completed | failed"
+        TEXT front_image_url
+        TEXT profile_image_url
+        NUMERIC height_cm_snapshot
+        NUMERIC weight_kg_snapshot
+        TEXT error_message
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ completed_at
+    }
+
+    SCAN_RESULTS {
+        UUID id PK
+        UUID scan_id FK, UK
+        NUMERIC body_fat_pct "e.g. 18.5"
+        NUMERIC bmi
+        TEXT method "navy_circumference | weighted_graph"
+        NUMERIC confidence_score "0.00 - 1.00"
+        TEXT notes
+        TIMESTAMPTZ created_at
+    }
+
+    BODY_MEASUREMENTS {
+        UUID id PK
+        UUID scan_id FK
+        TEXT region "neck | waist | hips | chest | bicep | thigh | calf"
+        NUMERIC value_cm
+        NUMERIC confidence "0.00 - 1.00"
+        BOOLEAN is_primary "true for Navy formula inputs"
+        TIMESTAMPTZ created_at
+    }
+
+    FEATURE_ANALYSES {
+        UUID id PK
+        UUID scan_id FK
+        UUID feature_weight_id FK "nullable"
+        TEXT feature_name
+        TEXT image_type "front | profile | both"
+        NUMERIC local_bf_estimate
+        NUMERIC confidence "0.00 - 1.00"
+        NUMERIC weight_applied "snapshot"
+        JSONB raw_llm_response
+        TEXT model_used "gemini-2.0-flash, qwen-vl-max..."
+        INTEGER latency_ms
+        TIMESTAMPTZ created_at
+    }
+
+    TRAINING_SCANS {
+        UUID id PK
+        UUID user_id FK "nullable — admin uploader"
+        UUID scan_id FK "nullable — links to scored scans row"
+        TEXT front_image_url
+        TEXT profile_image_url
+        NUMERIC known_bf_pct "ground truth"
+        TEXT gender
+        NUMERIC height_cm
+        NUMERIC weight_kg
+        TEXT source "dexa | bodpod | user_reported"
+        TIMESTAMPTZ scored_at "when pipeline ran"
+        TIMESTAMPTZ created_at
+    }
+
+    WEIGHT_OPTIMIZATION_RUNS {
+        UUID id PK
+        UUID config_id_produced FK "nullable — candidate config written"
+        TEXT gender_target "male | female"
+        INTEGER training_scan_count
+        NUMERIC baseline_mse "MSE of active weights on this sample"
+        NUMERIC mean_squared_error "final MSE after optimization"
+        NUMERIC mean_absolute_error
+        JSONB final_weights "snapshot of the optimized vector"
+        INTEGER iterations "accepted coordinate-descent moves"
+        TEXT notes
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ completed_at
+    }
+    NEON_AUTH_USER ||--o| USER_PROFILES : "has profile"
+    NEON_AUTH_USER ||--o{ SCANS : "creates"
+    NEON_AUTH_USER ||--o{ TRAINING_SCANS : "contributes"
+
+    SCANS ||--|| SCAN_RESULTS : "produces"
+    SCANS ||--o{ BODY_MEASUREMENTS : "derives"
+    SCANS ||--o{ FEATURE_ANALYSES : "generates"
+    SCANS }o--o| ANALYSIS_CONFIGS : "uses"
+
+    ANALYSIS_CONFIGS ||--o{ FEATURE_WEIGHTS : "contains"
+    FEATURE_WEIGHTS ||--o{ FEATURE_ANALYSES : "applied in"
+
+    TRAINING_SCANS }o--o| SCANS : "scored via synthetic scan"
+    WEIGHT_OPTIMIZATION_RUNS }o--o| ANALYSIS_CONFIGS : "produces"
+```
+
+  
 - [Information Flow Diagram](docs/IFD.md)
+
+```mermaid
+flowchart TD
+    subgraph AUTH["1. Authentication"]
+        A1[User visits /dashboard] --> A2{Session cookie?}
+        A2 -->|No| A3[Redirect to /login]
+        A3 --> A4[Sign in with Google]
+        A4 --> A5[Neon Auth OAuth → sync to neon_auth.user]
+        A5 --> A6[Session cookie set]
+        A2 -->|Yes| A6
+        A6 --> A7[neonAuthMiddleware validates on each request]
+    end
+
+    subgraph PROFILE["2. Profile Setup"]
+        A7 --> B1["User fills /profile:<br/>gender, DOB, height, weight"]
+        B1 --> B2[upsert user_profiles]
+    end
+
+    subgraph CAPTURE["3. Capture & Upload"]
+        B2 --> C1[Open /scan/new]
+        C1 --> C2{profile complete?}
+        C2 -->|No| B1
+        C2 -->|Yes| C3[getUserMedia 9:16 + SVG silhouette overlay]
+        C3 --> C4["3-2-1 countdown → canvas.toBlob JPEG 0.9<br/>front pose + profile pose"]
+        C4 --> C5["POST /api/scan → INSERT scans<br/>(status=uploading, h/w snapshot)"]
+        C5 --> C6["POST /api/blob/upload mints scoped token<br/>after verifying scans.user_id"]
+        C6 --> C7["Client PUT direct to Vercel Blob<br/>scans/<id>/{front,profile}.jpg"]
+        C7 --> C8["POST /api/scan/[id]/finalize<br/>UPDATE scans SET urls, status=analyzing"]
+    end
+
+    subgraph PIPELINE["4. LangGraph Pipeline (background via after())"]
+        C8 --> D1[runPipeline scanId]
+        D1 --> D2["Load scan + profile + active analysis_config<br/>by gender_target"]
+        D2 --> D3["crop.ts: fetch blobs → sharp.extract × 8 regions"]
+        D3 --> D4{"LangGraph Send fan-out<br/>8 parallel analyze_region"}
+
+        D4 --> R1[Jawline / Chin]
+        D4 --> R2[Neck]
+        D4 --> R3[Triceps / Arms]
+        D4 --> R4[Belly / Love Handles]
+        D4 --> R5[Waist / Navel]
+        D4 --> R6[Hip Region]
+        D4 --> R7[Forearm Vascularity]
+        D4 --> R8[Chest]
+
+        R1 --> V1["VLM Gemini/Qwen<br/>JSON: local_bf, confidence, explanation"]
+        R2 --> V2["VLM<br/>+ circumference_cm"]
+        R3 --> V3[VLM]
+        R4 --> V4[VLM]
+        R5 --> V5["VLM<br/>+ circumference_cm"]
+        R6 --> V6["VLM<br/>+ circumference_cm"]
+        R7 --> V7[VLM]
+        R8 --> V8["VLM<br/>+ circumference_cm"]
+
+        V1 & V2 & V3 & V4 & V5 & V6 & V7 & V8 --> D5[aggregate.ts fan-in]
+        D5 --> D6["Weighted avg BF% using feature_weights"]
+        D5 --> D7["Navy BF% from neck+waist+hips+height"]
+        D6 & D7 --> D8["50/50 blend → clamp 3..55 → Final BF% + Confidence"]
+
+        D8 --> D9[INSERT feature_analyses × 8]
+        D8 --> D10[INSERT body_measurements neck/waist/hips/chest]
+        D8 --> D11[INSERT scan_results]
+        D8 --> D12[UPDATE scans status=completed or failed]
+    end
+
+    subgraph POLL["5. Status Polling & Results"]
+        C8 --> E1["Client redirected to /scan/id<br/>renders spinner"]
+        E1 --> E2["ScanPolling: GET /api/scan/id/status every 3s"]
+        E2 --> E3{status?}
+        E3 -->|analyzing| E2
+        E3 -->|completed/failed| E4[router.refresh]
+        D12 -.status flip.-> E3
+        E4 --> E5["Render results: BF%, per-region breakdown"]
+        E5 --> E6[Dashboard + Trendline Charts]
+    end
+
+    subgraph TRAIN["6. Admin Training Ingest"]
+        T1[Admin at /admin/training uploads labeled photos] --> T2["POST /api/admin/training/upload<br/>blob token"]
+        T2 --> T3["Direct upload training/<tempId>/{front,profile}.jpg"]
+        T3 --> T4["POST /api/admin/training<br/>INSERT training_scans known_bf_pct + gender"]
+    end
+
+    subgraph SCORE["7. Score Training Samples"]
+        T4 --> N1["Admin: 'Score all unscored'"]
+        N1 --> N2[POST /api/admin/training/score-all]
+        N2 --> N3{"For each training_scan<br/>WHERE scan_id IS NULL"}
+        N3 --> N4[INSERT synthetic scans row owned by admin]
+        N4 --> N5[runPipelineWithInputs with LABELED gender]
+        N5 -.reuses.-> D1
+        N5 --> N6["UPDATE training_scans SET scan_id, scored_at"]
+        N6 --> N3
+    end
+
+    subgraph OPT["8. Optimize Weight Vector"]
+        O1["Admin: 'Optimize male/female' at /admin/optimize"] --> O2[POST /api/admin/optimize]
+        O2 --> O3["loadSamples: JOIN training_scans →<br/>feature_analyses + body_measurements"]
+        O3 --> O4["Recompute Navy BF from stored circumferences<br/>via shared navy.ts"]
+        O4 --> O5["Coordinate descent:<br/>transfer weight between region pairs"]
+        O5 --> O6{MSE improved?}
+        O6 -->|Yes| O7[Accept move]
+        O6 -->|No| O8[Halve step]
+        O7 --> O5
+        O8 --> O5
+        O5 --> O9["Converge when step < minStep"]
+    end
+
+    subgraph PROMOTE["9. Persist + Promote"]
+        O9 --> P1["INSERT analysis_configs is_active=false<br/>gender_target=X"]
+        P1 --> P2[INSERT feature_weights rows]
+        P2 --> P3["INSERT weight_optimization_runs<br/>baseline_mse, final_mse, MAE, iters"]
+        P3 --> P4{"Admin reviews bar chart<br/>current vs candidate"}
+        P4 -->|Promote| P5["POST /api/admin/optimize/promote<br/>flip is_active"]
+        P4 -->|Keep| P6[Candidate stays inactive]
+        P5 -.new active config.-> D2
+    end
+```
 
 ## Getting Started
 
