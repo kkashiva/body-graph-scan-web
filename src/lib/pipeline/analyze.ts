@@ -36,7 +36,7 @@ export async function analyzeRegion(
   const vlm = createVlm();
   const modelName =
     process.env.VLM_MODEL ??
-    (process.env.VLM_PROVIDER === 'qwen' ? 'qwen-vl-plus' : 'gemini-2.0-flash');
+    (process.env.VLM_PROVIDER === 'qwen' ? 'qwen3.6-plus' : 'gemini-3.1-flash-lite');
 
   const start = Date.now();
 
