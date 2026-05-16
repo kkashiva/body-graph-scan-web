@@ -119,7 +119,7 @@ flowchart TD
 | Auth | Neon Auth (Google OAuth) |
 | AI Pipeline | [LangGraph](https://langchain-ai.github.io/langgraphjs/) (LangChain JS) -- fan-out/fan-in graph |
 | Image Processing | [sharp](https://sharp.pixelplumbing.com/) -- server-side region cropping |
-| LLM Providers | Google Gemini, Qwen VL (via [OpenRouter](https://openrouter.ai)) |
+| LLM Providers | Google Gemini, Qwen (via [Alibaba Cloud Model Studio](https://bailian.console.alibabacloud.com/)) |
 | Hosting | Vercel |
 
 ## Implementation Status
@@ -429,9 +429,9 @@ npm run optimize:weights -- --gender female --persist
 | `NEON_AUTH_COOKIE_SECRET` | Auth cookie secret (`openssl rand -base64 32`) |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob store token (auto-injected on Vercel when a store is linked; required in `.env.local` for local uploads) |
 | `VLM_PROVIDER` | `gemini` (default) or `qwen` |
-| `VLM_MODEL` | Model name override (default: `gemini-2.0-flash` / `qwen/qwen2.5-vl-72b-instruct`) |
+| `VLM_MODEL` | Model name override (default: `gemini-3.1-flash-lite` / `qwen3.6-plus`) |
 | `GOOGLE_API_KEY` | Google AI API key (required when `VLM_PROVIDER=gemini`) |
-| `OPENROUTER_API_KEY` | OpenRouter API key (required when `VLM_PROVIDER=qwen`) |
+| `DASHSCOPE_API_KEY` | Alibaba Cloud Model Studio API key (required when `VLM_PROVIDER=qwen`) |
 
 ### Admin access
 
@@ -486,7 +486,7 @@ src/
     pipeline/
       state.ts                      # LangGraph state annotation (Annotation.Root)
       regions.ts                    # 8 body region definitions (bounding boxes + prompts)
-      providers.ts                  # VLM factory (Gemini / Qwen via OpenRouter)
+      providers.ts                  # VLM factory (Gemini / Qwen via Alibaba Cloud Model Studio)
       crop.ts                       # Node 1: image download + sharp crop per region
       analyze.ts                    # Nodes 2-9: multimodal VLM call per region (fan-out)
       aggregate.ts                  # Node 10: weighted avg + Navy formula + DB writes (fan-in)
@@ -539,7 +539,7 @@ After finalize, the client redirects to `/scan/<id>` which polls `GET /api/scan/
 2. **Analyze (fan-out)** -- 8 parallel VLM calls, one per region. Each receives a cropped image + a tuned system prompt requesting a JSON response with `local_bf_estimate`, `confidence`, `explanation`, and optionally `circumference_cm`.
 3. **Aggregate (fan-in)** -- Computes weighted average BF% from per-region estimates, Navy formula BF% from circumference estimates, BMI, and writes `feature_analyses`, `body_measurements`, and `scan_results` rows. Sets `scans.status = 'completed'`.
 
-The VLM provider is controlled by `VLM_PROVIDER` env var (`gemini` or `qwen`). Qwen is accessed via [OpenRouter](https://openrouter.ai) since DashScope is unavailable in India.
+The VLM provider is controlled by `VLM_PROVIDER` env var (`gemini` or `qwen`). Qwen is accessed via [Alibaba Cloud Model Studio](https://bailian.console.alibabacloud.com/) using its OpenAI-compatible international (Singapore) endpoint.
 
 ## Weight Optimization (Phase 5)
 

@@ -8,10 +8,10 @@ export type VlmProvider = 'gemini' | 'qwen';
  * Create a multimodal VLM instance based on environment configuration.
  *
  * Env vars:
- *   VLM_PROVIDER       — 'gemini' (default) or 'qwen'
- *   VLM_MODEL          — model name override
- *   GOOGLE_API_KEY     — required for gemini
- *   OPENROUTER_API_KEY — required for qwen (via OpenRouter)
+ *   VLM_PROVIDER      — 'gemini' (default) or 'qwen'
+ *   VLM_MODEL         — model name override
+ *   GOOGLE_API_KEY    — required for gemini
+ *   DASHSCOPE_API_KEY — required for qwen (Alibaba Cloud Model Studio)
  */
 export function createVlm(
   providerOverride?: VlmProvider,
@@ -20,12 +20,12 @@ export function createVlm(
   const provider = providerOverride ?? (process.env.VLM_PROVIDER as VlmProvider) ?? 'gemini';
 
   if (provider === 'qwen') {
-    const model = modelOverride ?? process.env.VLM_MODEL ?? 'qwen/qwen2.5-vl-72b-instruct';
+    const model = modelOverride ?? process.env.VLM_MODEL ?? 'qwen3.6-plus';
     return new ChatOpenAI({
       model,
-      apiKey: process.env.OPENROUTER_API_KEY,
+      apiKey: process.env.DASHSCOPE_API_KEY,
       configuration: {
-        baseURL: 'https://openrouter.ai/api/v1',
+        baseURL: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
       },
       temperature: 0.2,
       maxTokens: 1024,
@@ -33,7 +33,7 @@ export function createVlm(
   }
 
   // Default: Gemini
-  const model = modelOverride ?? process.env.VLM_MODEL ?? 'gemini-2.0-flash';
+  const model = modelOverride ?? process.env.VLM_MODEL ?? 'gemini-3.1-flash-lite';
   return new ChatGoogleGenerativeAI({
     model,
     apiKey: process.env.GOOGLE_API_KEY,
